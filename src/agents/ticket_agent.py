@@ -9,7 +9,7 @@ from agent_framework import ai_function
 from typing import Any, Dict, Optional
 import os
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from .utils import create_azure_ai_client
 
 
@@ -125,7 +125,7 @@ When you've completed creating the ticket, let them know they'll be returned to 
                     "priority": priority,
                     "category": category,
                     "status": "Open",
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                 }
 
                 # Create ticket via API
@@ -236,8 +236,8 @@ When you've completed creating the ticket, let them know they'll be returned to 
                 token_response = response.json()
                 self._access_token = token_response.get("access_token")
 
-        except Exception as e:
-            print(f"Error getting access token: {e}")
+        except Exception:
+            # Avoid logging sensitive authentication details
             self._access_token = None
 
     def get_agent(self):

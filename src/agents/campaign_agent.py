@@ -7,7 +7,7 @@ of distributors.
 
 from agent_framework import ai_function
 from typing import Any, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from .utils import create_azure_ai_client
 
 
@@ -108,7 +108,7 @@ When you've completed the campaign action, let them know they'll be returned to 
 
                 # Create campaign data
                 campaign_data = {
-                    "campaign_id": f"CAMP-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+                    "campaign_id": f"CAMP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
                     "name": campaign_name,
                     "type": campaign_type,
                     "target_audience": target_audience,
@@ -117,7 +117,7 @@ When you've completed the campaign action, let them know they'll be returned to 
                     "budget": budget,
                     "description": description,
                     "status": "Created",
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                 }
 
                 # In a real implementation, this would call an API or database
@@ -192,7 +192,7 @@ When you've completed the campaign action, let them know they'll be returned to 
                     datetime.fromisoformat(end_date.replace('Z', '+00:00'))
                     updates["end_date"] = end_date
 
-                updates["last_modified"] = datetime.utcnow().isoformat()
+                updates["last_modified"] = datetime.now(timezone.utc).isoformat()
 
                 # In a real implementation, this would update via API or database
                 return {
@@ -289,12 +289,12 @@ When you've completed the campaign action, let them know they'll be returned to 
 
                 # Execute the action based on type
                 action_result = {
-                    "action_id": f"ACT-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+                    "action_id": f"ACT-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
                     "distributor_id": distributor_id,
                     "action_type": action_type,
                     "parameters": parameters,
                     "status": "Completed",
-                    "executed_at": datetime.utcnow().isoformat()
+                    "executed_at": datetime.now(timezone.utc).isoformat()
                 }
 
                 return {

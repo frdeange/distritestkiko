@@ -142,6 +142,13 @@ AZURE_COMMUNICATION_CONNECTION_STRING=your-connection-string-here
 AZURE_COMMUNICATION_SENDER_EMAIL=noreply@your-domain.com
 ```
 
+**Security Note for Production**: This PoC stores credentials in environment variables and agent instances for simplicity. For production deployments:
+- Use **Azure Key Vault** or similar secret management solutions to store sensitive credentials
+- Implement proper secret rotation policies
+- Use managed identities where possible (e.g., DefaultAzureCredential for Azure services)
+- Never commit `.env` files or credentials to version control
+- Consider using Azure Managed Identity to eliminate the need for storing credentials
+
 ## Usage
 
 ### Running the Application
