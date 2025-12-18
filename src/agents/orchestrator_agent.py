@@ -88,20 +88,51 @@ Be concise, professional, and helpful."""
         Get handoff tools for routing to specialized agents.
         """
         tools = []
-        
-        # Add handoffs to available agents
+
+        # Add handoffs to available agents using HandoffBuilder
         if self.support_agent:
-            tools.append(self.support_agent)
-        
+            support_handoff = HandoffBuilder(
+                target_agent=self.support_agent,
+                name="Support Agent",
+                description=(
+                    "Route technical questions, documentation requests, and general "
+                    "product inquiries to the Support Agent."
+                ),
+            ).build()
+            tools.append(support_handoff)
+
         if self.ticket_agent:
-            tools.append(self.ticket_agent)
-        
+            ticket_handoff = HandoffBuilder(
+                target_agent=self.ticket_agent,
+                name="Ticket Agent",
+                description=(
+                    "Route issue reports and escalation or ticket creation requests "
+                    "to the Ticket Agent."
+                ),
+            ).build()
+            tools.append(ticket_handoff)
+
         if self.database_agent:
-            tools.append(self.database_agent)
-        
+            database_handoff = HandoffBuilder(
+                target_agent=self.database_agent,
+                name="Database Agent",
+                description=(
+                    "Route data retrieval, historical lookup, reporting, and "
+                    "analytics queries to the Database Agent."
+                ),
+            ).build()
+            tools.append(database_handoff)
+
         if self.campaign_agent:
-            tools.append(self.campaign_agent)
-        
+            campaign_handoff = HandoffBuilder(
+                target_agent=self.campaign_agent,
+                name="Campaign Agent",
+                description=(
+                    "Route distributor actions and marketing campaign management "
+                    "requests to the Campaign Agent."
+                ),
+            ).build()
+            tools.append(campaign_handoff)
         return tools
 
     def get_agent(self):
