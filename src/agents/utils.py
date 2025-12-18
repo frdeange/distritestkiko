@@ -5,7 +5,7 @@ Utility functions for creating chat clients and other common functionality.
 import os
 from typing import Optional
 from agent_framework_azure_ai import AzureAIClient
-from azure.identity.aio import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential
 
 
 def create_azure_ai_client(
