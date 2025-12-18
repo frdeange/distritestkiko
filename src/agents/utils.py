@@ -4,12 +4,14 @@ Utility functions for creating chat clients and other common functionality.
 
 import os
 from typing import Optional
+from agent_framework_azure_ai import AzureAIClient
+from azure.identity.aio import DefaultAzureCredential
 
 
 def create_azure_ai_client(
     project_endpoint: Optional[str] = None,
     model_deployment_name: Optional[str] = None,
-):
+) -> AzureAIClient:
     """
     Create an Azure AI chat client for use with agents.
     
@@ -19,22 +21,9 @@ def create_azure_ai_client(
     
     Returns:
         Configured AzureAIClient instance
-        
-    Note:
-        This requires proper Azure credentials to be configured.
-        For development/testing without credentials, agents may need to be mocked.
     """
-    from agent_framework_azure_ai import AzureAIClient
-    from azure.identity.aio import DefaultAzureCredential
-    
     endpoint = project_endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
     model = model_deployment_name or os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4")
-    
-    if not endpoint:
-        raise ValueError(
-            "Azure OpenAI endpoint not configured. "
-            "Please set AZURE_OPENAI_ENDPOINT in your .env file or pass project_endpoint parameter."
-        )
     
     # Create client with default Azure credentials
     client = AzureAIClient(
