@@ -208,7 +208,7 @@ User: "Find customer information for ID 12345"
 
 #### Campaign Management
 ```
-User: "Create a new email campaign for Q1 2024"
+User: "Create a new email campaign for next quarter"
 → Routed to Campaign Agent
 → Collects campaign details
 → Creates and schedules campaign
