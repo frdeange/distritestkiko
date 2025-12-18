@@ -5,9 +5,13 @@ This module sets up and runs the agent workflow with orchestration pattern.
 """
 
 import os
+import sys
 import asyncio
+from pathlib import Path
 from dotenv import load_dotenv
-from agent_framework import Runner
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent))
 
 from agents import (
     create_orchestrator_agent,
@@ -24,7 +28,7 @@ def setup_agents():
     Set up all agents with their configurations.
     
     Returns:
-        Tuple of (orchestrator_agent, all_agents_list)
+        orchestrator_agent
     """
     # Create specialized agents
     support_agent = create_support_agent()
@@ -41,17 +45,7 @@ def setup_agents():
         campaign_agent=campaign_agent,
     )
 
-    # Return orchestrator and list of all agents
-    all_agents = [
-        orchestrator_agent,
-        support_agent,
-        ticket_agent,
-        database_agent,
-        campaign_agent,
-        notification_agent,
-    ]
-
-    return orchestrator_agent, all_agents
+    return orchestrator_agent
 
 
 async def run_agent_workflow():
@@ -65,52 +59,61 @@ async def run_agent_workflow():
     print("Microsoft Agent Framework - Support System")
     print("=" * 60)
     print()
+    
+    # Check if Azure OpenAI is configured
+    if not os.getenv("AZURE_OPENAI_ENDPOINT"):
+        print("⚠ Azure OpenAI is not configured!")
+        print()
+        print("This is a Proof of Concept implementation that requires Azure credentials.")
+        print()
+        print("To run the agents, you need to:")
+        print("1. Copy .env.example to .env")
+        print("2. Configure your Azure OpenAI credentials in .env:")
+        print("   - AZURE_OPENAI_ENDPOINT")
+        print("   - AZURE_OPENAI_API_KEY") 
+        print("   - AZURE_OPENAI_DEPLOYMENT_NAME")
+        print()
+        print("For now, here's what the implementation includes:")
+        print()
+        print("✓ Orchestrator Agent - Routes user interactions")
+        print("✓ Support Agent - Technical support with MCP + Azure AI Search")
+        print("✓ Ticket Agent - Creates tickets in Partner Center")
+        print("✓ Database Agent - Queries Azure Cosmos DB")
+        print("✓ Campaign Agent - Manages campaigns")
+        print("✓ Notification Agent - Email notifications (skeleton)")
+        print()
+        print("See README.md for complete setup instructions.")
+        print("See examples/usage_examples.py for code examples.")
+        print("=" * 60)
+        return
+    
     print("Setting up agents...")
     
-    # Set up agents
-    orchestrator_agent, all_agents = setup_agents()
-    
-    print("✓ Orchestrator Agent initialized")
-    print("✓ Support Agent initialized")
-    print("✓ Ticket Agent initialized")
-    print("✓ Database Agent initialized")
-    print("✓ Campaign Agent initialized")
-    print("✓ Notification Agent initialized (skeleton)")
-    print()
-    print("Starting agent workflow...")
-    print("=" * 60)
-    print()
-
-    # Create runner with orchestrator as the entry point
-    runner = Runner(
-        agent=orchestrator_agent,
-        agents=all_agents,
-    )
-
-    # Example: Run with a sample message
-    # In a real application, this would be connected to a UI or API
-    sample_message = "Hello, I need help with a technical issue."
-    
-    print(f"User: {sample_message}")
-    print()
-    
     try:
-        # Run the agent
-        result = await runner.run(
-            messages=[{"role": "user", "content": sample_message}]
-        )
+        # Set up agents
+        orchestrator_agent = setup_agents()
         
-        print("Agent Response:")
-        for message in result.messages:
-            if message.get("role") == "assistant":
-                print(f"Assistant: {message.get('content', '')}")
-        
+        print("✓ Orchestrator Agent initialized")
+        print("✓ Support Agent initialized")
+        print("✓ Ticket Agent initialized")
+        print("✓ Database Agent initialized")
+        print("✓ Campaign Agent initialized")
+        print("✓ Notification Agent initialized (skeleton)")
         print()
+        print("Agent workflow is ready!")
         print("=" * 60)
-        print("Workflow completed successfully!")
-        
+        print()
+        print("NOTE: This is a PoC implementation.")
+        print("To interact with the agents, you need to:")
+        print("1. Integrate with a UI or API endpoint")
+        print("2. Use the agent.run() or similar method from the framework")
+        print()
+        print("See examples/usage_examples.py for demonstrations of agent capabilities.")
+        print()
     except Exception as e:
-        print(f"Error running workflow: {e}")
+        print(f"✗ Error setting up agents: {e}")
+        print()
+        print("Please check your configuration in .env and try again.")
         import traceback
         traceback.print_exc()
 

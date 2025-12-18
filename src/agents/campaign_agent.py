@@ -5,10 +5,11 @@ This agent handles campaign execution and management actions on behalf
 of distributors.
 """
 
-from agent_framework import ChatAgent, ai_function
+from agent_framework import ai_function
 from typing import Any, Dict, List, Optional
 import os
 from datetime import datetime
+from .utils import create_azure_ai_client
 
 
 class CampaignAgent:
@@ -19,9 +20,9 @@ class CampaignAgent:
     def __init__(self):
         """Initialize the Campaign Agent."""
         # Create the campaign agent
-        self.agent = ChatAgent(
+        chat_client = create_azure_ai_client()
+        self.agent = chat_client.create_agent(
             name="campaign",
-            model="azure-openai",
             instructions=self._get_instructions(),
             tools=self._setup_tools(),
         )
@@ -319,17 +320,17 @@ When you've completed the campaign action, let them know they'll be returned to 
 
         return execute_distributor_action
 
-    def get_agent(self) -> ChatAgent:
-        """Return the configured ChatAgent instance."""
+    def get_agent(self):
+        """Return the configured agent instance."""
         return self.agent
 
 
-def create_campaign_agent() -> ChatAgent:
+def create_campaign_agent():
     """
     Factory function to create and return a Campaign Agent.
 
     Returns:
-        Configured ChatAgent for campaign management
+        Configured agent for campaign management
     """
     campaign = CampaignAgent()
     return campaign.get_agent()

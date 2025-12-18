@@ -11,6 +11,7 @@ This agent routes user interactions to the appropriate specialized agent:
 from agent_framework import ChatAgent, HandoffBuilder
 from typing import Optional
 import os
+from .utils import create_azure_ai_client
 
 
 class OrchestratorAgent:
@@ -41,11 +42,11 @@ class OrchestratorAgent:
         self.campaign_agent = campaign_agent
 
         # Create the orchestrator agent
-        self.agent = ChatAgent(
+        chat_client = create_azure_ai_client()
+        self.agent = chat_client.create_agent(
             name="orchestrator",
-            model="azure-openai",
             instructions=self._get_instructions(),
-            handoffs=self._setup_handoffs(),
+            tools=self._get_handoff_tools(),
         )
 
     def _get_instructions(self) -> str:
@@ -83,53 +84,29 @@ Always:
 
 Be concise, professional, and helpful."""
 
-    def _setup_handoffs(self) -> list:
+    def _get_handoff_tools(self) -> list:
         """
-        Set up handoff configurations to specialized agents.
-        Uses returnToPrevious pattern for better user experience.
+        Get handoff tools for routing to specialized agents.
         """
-        handoffs = []
-
+        tools = []
+        
+        # Add handoffs to available agents
         if self.support_agent:
-            handoffs.append(
-                HandoffBuilder(
-                    target=self.support_agent,
-                    return_to_previous=True,
-                    description="Transfer to Support Agent for technical questions and documentation",
-                )
-            )
-
+            tools.append(self.support_agent)
+        
         if self.ticket_agent:
-            handoffs.append(
-                HandoffBuilder(
-                    target=self.ticket_agent,
-                    return_to_previous=True,
-                    description="Transfer to Ticket Agent for creating support tickets",
-                )
-            )
-
+            tools.append(self.ticket_agent)
+        
         if self.database_agent:
-            handoffs.append(
-                HandoffBuilder(
-                    target=self.database_agent,
-                    return_to_previous=True,
-                    description="Transfer to Database Agent for querying information",
-                )
-            )
-
+            tools.append(self.database_agent)
+        
         if self.campaign_agent:
-            handoffs.append(
-                HandoffBuilder(
-                    target=self.campaign_agent,
-                    return_to_previous=True,
-                    description="Transfer to Campaign Agent for distributor actions",
-                )
-            )
+            tools.append(self.campaign_agent)
+        
+        return tools
 
-        return handoffs
-
-    def get_agent(self) -> ChatAgent:
-        """Return the configured ChatAgent instance."""
+    def get_agent(self):
+        """Return the configured agent instance."""
         return self.agent
 
 
@@ -138,7 +115,7 @@ def create_orchestrator_agent(
     ticket_agent=None,
     database_agent=None,
     campaign_agent=None,
-) -> ChatAgent:
+):
     """
     Factory function to create and return an Orchestrator Agent.
 
@@ -149,7 +126,7 @@ def create_orchestrator_agent(
         campaign_agent: Campaign Agent instance
 
     Returns:
-        Configured ChatAgent for orchestration
+        Configured agent for orchestration
     """
     orchestrator = OrchestratorAgent(
         support_agent=support_agent,

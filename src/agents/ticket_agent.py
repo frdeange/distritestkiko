@@ -5,11 +5,12 @@ This agent handles creating support tickets in the Microsoft Partner Center
 using OpenAPI integration.
 """
 
-from agent_framework import ChatAgent, ai_function
+from agent_framework import ai_function
 from typing import Any, Dict, Optional
 import os
 import httpx
 from datetime import datetime
+from .utils import create_azure_ai_client
 
 
 class TicketAgent:
@@ -41,9 +42,9 @@ class TicketAgent:
         self._access_token = None
 
         # Create the ticket agent
-        self.agent = ChatAgent(
+        chat_client = create_azure_ai_client()
+        self.agent = chat_client.create_agent(
             name="ticket",
-            model="azure-openai",
             instructions=self._get_instructions(),
             tools=self._setup_tools(),
         )
@@ -239,8 +240,8 @@ When you've completed creating the ticket, let them know they'll be returned to 
             print(f"Error getting access token: {e}")
             self._access_token = None
 
-    def get_agent(self) -> ChatAgent:
-        """Return the configured ChatAgent instance."""
+    def get_agent(self):
+        """Return the configured agent instance."""
         return self.agent
 
 
@@ -249,7 +250,7 @@ def create_ticket_agent(
     tenant_id: Optional[str] = None,
     client_id: Optional[str] = None,
     client_secret: Optional[str] = None,
-) -> ChatAgent:
+):
     """
     Factory function to create and return a Ticket Agent.
 
@@ -260,7 +261,7 @@ def create_ticket_agent(
         client_secret: Azure AD application client secret
 
     Returns:
-        Configured ChatAgent for ticket management
+        Configured agent for ticket management
     """
     ticket = TicketAgent(
         partner_center_endpoint=partner_center_endpoint,

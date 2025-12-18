@@ -6,10 +6,11 @@ This agent handles technical questions and documentation requests using:
 - Azure AI Search for knowledge base queries
 """
 
-from agent_framework import ChatAgent, MCPStreamableHTTPTool, ai_function
+from agent_framework import ai_function, MCPStreamableHTTPTool
 from typing import Any, Dict, List, Optional
 import os
 import httpx
+from .utils import create_azure_ai_client
 
 
 class SupportAgent:
@@ -39,9 +40,9 @@ class SupportAgent:
         self.ai_search_index_name = ai_search_index_name or os.getenv("AZURE_AI_SEARCH_INDEX_NAME")
 
         # Create the support agent
-        self.agent = ChatAgent(
+        chat_client = create_azure_ai_client()
+        self.agent = chat_client.create_agent(
             name="support",
-            model="azure-openai",
             instructions=self._get_instructions(),
             tools=self._setup_tools(),
         )
@@ -154,8 +155,8 @@ When you've completed helping the user, let them know they'll be returned to the
 
         return search_knowledge_base
 
-    def get_agent(self) -> ChatAgent:
-        """Return the configured ChatAgent instance."""
+    def get_agent(self):
+        """Return the configured agent instance."""
         return self.agent
 
 
@@ -164,7 +165,7 @@ def create_support_agent(
     ai_search_endpoint: Optional[str] = None,
     ai_search_api_key: Optional[str] = None,
     ai_search_index_name: Optional[str] = None,
-) -> ChatAgent:
+):
     """
     Factory function to create and return a Support Agent.
 
@@ -175,7 +176,7 @@ def create_support_agent(
         ai_search_index_name: Azure AI Search index name
 
     Returns:
-        Configured ChatAgent for technical support
+        Configured agent for technical support
     """
     support = SupportAgent(
         mcp_server_url=mcp_server_url,

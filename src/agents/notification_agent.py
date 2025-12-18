@@ -5,9 +5,10 @@ This is a skeleton implementation for future development.
 The agent will send email notifications using Azure Communication Service.
 """
 
-from agent_framework import ChatAgent, ai_function
+from agent_framework import ai_function
 from typing import Any, Dict, List, Optional
 import os
+from .utils import create_azure_ai_client
 
 
 class NotificationAgent:
@@ -35,9 +36,9 @@ class NotificationAgent:
         self.sender_email = sender_email or os.getenv("AZURE_COMMUNICATION_SENDER_EMAIL")
 
         # Create the notification agent
-        self.agent = ChatAgent(
+        chat_client = create_azure_ai_client()
+        self.agent = chat_client.create_agent(
             name="notification",
-            model="azure-openai",
             instructions=self._get_instructions(),
             tools=self._setup_tools(),
         )
@@ -108,15 +109,15 @@ When users interact with you, let them know this functionality is planned for a 
 
         return send_email_notification
 
-    def get_agent(self) -> ChatAgent:
-        """Return the configured ChatAgent instance."""
+    def get_agent(self):
+        """Return the configured agent instance."""
         return self.agent
 
 
 def create_notification_agent(
     communication_connection_string: Optional[str] = None,
     sender_email: Optional[str] = None,
-) -> ChatAgent:
+):
     """
     Factory function to create and return a Notification Agent (Skeleton).
 
@@ -125,7 +126,7 @@ def create_notification_agent(
         sender_email: Sender email address
 
     Returns:
-        Configured ChatAgent for notifications (skeleton implementation)
+        Configured agent for notifications (skeleton implementation)
     """
     notification = NotificationAgent(
         communication_connection_string=communication_connection_string,

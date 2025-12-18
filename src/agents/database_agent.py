@@ -5,10 +5,11 @@ This agent handles queries to Azure Cosmos DB and provides data retrieval
 capabilities for the system.
 """
 
-from agent_framework import ChatAgent, ai_function, HandoffBuilder
+from agent_framework import ai_function
 from typing import Any, Dict, List, Optional
 import os
 from azure.cosmos import CosmosClient, exceptions
+from .utils import create_azure_ai_client
 
 
 class DatabaseAgent:
@@ -43,9 +44,9 @@ class DatabaseAgent:
         self._container = None
 
         # Create the database agent
-        self.agent = ChatAgent(
+        chat_client = create_azure_ai_client()
+        self.agent = chat_client.create_agent(
             name="database",
-            model="azure-openai",
             instructions=self._get_instructions(),
             tools=self._setup_tools(),
         )
@@ -289,8 +290,8 @@ When you've completed the database query, let them know they'll be returned to t
 
         return get_history
 
-    def get_agent(self) -> ChatAgent:
-        """Return the configured ChatAgent instance."""
+    def get_agent(self):
+        """Return the configured agent instance."""
         return self.agent
 
 
@@ -299,7 +300,7 @@ def create_database_agent(
     cosmos_key: Optional[str] = None,
     database_name: Optional[str] = None,
     container_name: Optional[str] = None,
-) -> ChatAgent:
+):
     """
     Factory function to create and return a Database Agent.
 
@@ -310,7 +311,7 @@ def create_database_agent(
         container_name: Container name
 
     Returns:
-        Configured ChatAgent for database queries
+        Configured agent for database queries
     """
     database = DatabaseAgent(
         cosmos_endpoint=cosmos_endpoint,
