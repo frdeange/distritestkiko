@@ -7,7 +7,6 @@ of distributors.
 
 from agent_framework import ai_function
 from typing import Any, Dict, List, Optional
-import os
 from datetime import datetime
 from .utils import create_azure_ai_client
 
