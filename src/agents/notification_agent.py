@@ -6,7 +6,7 @@ The agent will send email notifications using Azure Communication Service.
 """
 
 from agent_framework import ai_function
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 import os
 from .utils import create_azure_ai_client
 
