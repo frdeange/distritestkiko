@@ -230,35 +230,27 @@ When you've completed the campaign action, let them know they'll be returned to 
             Returns:
                 Campaign status and performance metrics
             """
-            try:
-                # In a real implementation, this would query the database
-                # For now, we'll simulate a response
-                campaign_status = {
-                    "campaign_id": campaign_id,
-                    "status": "Active",
-                    "metrics": {
-                        "impressions": 15000,
-                        "clicks": 450,
-                        "conversions": 23,
-                        "engagement_rate": "3.0%",
-                        "conversion_rate": "5.1%",
-                    },
-                    "budget_used": 750.00,
-                    "budget_remaining": 250.00,
-                    "days_remaining": 7
-                }
+            # In a real implementation, this would query the database
+            # For now, we'll simulate a response
+            campaign_status = {
+                "campaign_id": campaign_id,
+                "status": "Active",
+                "metrics": {
+                    "impressions": 15000,
+                    "clicks": 450,
+                    "conversions": 23,
+                    "engagement_rate": "3.0%",
+                    "conversion_rate": "5.1%",
+                },
+                "budget_used": 750.00,
+                "budget_remaining": 250.00,
+                "days_remaining": 7
+            }
 
-                return {
-                    "success": True,
-                    "campaign": campaign_status
-                }
-
-            except Exception as e:
-                return {
-                    "success": False,
-                    "error": f"Failed to get campaign status: {str(e)}"
-                }
-
+            return {
+                "success": True,
+                "campaign": campaign_status
+            }
         return get_campaign_status
 
     def _execute_distributor_action_tool(self):
