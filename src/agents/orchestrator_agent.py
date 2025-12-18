@@ -10,7 +10,6 @@ This agent routes user interactions to the appropriate specialized agent:
 
 from agent_framework import ChatAgent, HandoffBuilder
 from typing import Optional
-import os
 from .utils import create_azure_ai_client
 
 
