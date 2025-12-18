@@ -43,6 +43,7 @@ def setup_agents():
         ticket_agent=ticket_agent,
         database_agent=database_agent,
         campaign_agent=campaign_agent,
+        notification_agent=notification_agent,
     )
 
     return orchestrator_agent
