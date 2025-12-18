@@ -8,7 +8,7 @@ This agent routes user interactions to the appropriate specialized agent:
 - Campaign Agent: Distributor actions
 """
 
-from agent_framework import ChatAgent, HandoffBuilder
+from agent_framework import ChatAgent
 from typing import Optional
 from .utils import create_azure_ai_client
 
