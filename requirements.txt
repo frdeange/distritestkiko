@@ -1,1 +1,1 @@
-agent-framework==1.0.0b251216
+agent-framework>=1.0.0b251223
