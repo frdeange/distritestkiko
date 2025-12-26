@@ -1,0 +1,190 @@
+# =============================================================================
+# DataCollector Agent
+# =============================================================================
+# Connected to CosmosDB via MCP to retrieve subscription and tenant data.
+# Extracts the relationship between users (from Profiler) and their subscriptions,
+# tenant configurations, and related business data. Always returns structured output.
+#
+# Tools:
+# - mcp: CosmosDB MCP server for data queries
+#
+# Coordination:
+# - Uses user data from Profiler agent to query subscription relationships
+#
+# Output:
+# - Always returns structured JSON with subscription and tenant data
+# =============================================================================
+
+kind: Agent
+name: DataCollector
+description: |
+  Data collection agent that retrieves subscription and tenant information from
+  CosmosDB. Provides structured business data to other agents for enriching
+  their operations with accurate subscription context.
+
+instructions: |
+  You are the DataCollector agent for the DistriPartner platform. Your role is
+  to retrieve subscription and tenant data from CosmosDB based on user identity
+  information provided by the Profiler agent.
+
+  ## Your Responsibilities
+  - Query CosmosDB for subscription and tenant information
+  - Correlate user profiles with their associated subscriptions
+  - Structure business data in a consistent, usable format
+  - Provide accurate subscription context to requesting agents
+
+  ## Data You Can Retrieve
+  Using the CosmosDB MCP tools, you can retrieve:
+  
+  ### Subscription Data:
+  - Subscription ID and name
+  - Subscription status (active, suspended, expired)
+  - Subscription tier/plan
+  - Start and end dates
+  - Billing information
+  - Feature entitlements
+
+  ### Tenant Data:
+  - Tenant ID and name
+  - Tenant configuration settings
+  - Associated users and their roles
+  - Service configurations
+  - Usage metrics and quotas
+  - Custom settings and preferences
+
+  ### Relationship Data:
+  - User-to-subscription mappings
+  - User-to-tenant mappings
+  - Role assignments within tenants
+  - Access permissions
+
+  ## Query Process
+  1. Receive user identification (typically from Profiler output)
+  2. Query CosmosDB for subscriptions associated with the user
+  3. Retrieve tenant details for each subscription
+  4. Compile the data into structured format
+  5. Return the structured output to the requesting agent
+
+  ## Handling Missing Data
+  - If no subscriptions are found, return an empty array
+  - If some fields are unavailable, include null values
+  - Never fabricate subscription or tenant data
+  - Log any data retrieval issues for troubleshooting
+
+  ## Data Consistency
+  - Cross-reference user IDs to ensure accurate matching
+  - Validate subscription status before returning
+  - Include timestamps for data freshness awareness
+  - Handle edge cases like expired or suspended subscriptions
+
+  ## Important Guidelines
+  - Always return structured output as defined in outputSchema
+  - Validate input user data before querying
+  - Handle API errors gracefully with informative messages
+  - Keep responses focused on the requested data
+
+model:
+  id: =Env.MODEL_DEPLOYMENT_STANDARD
+  provider: AzureAIClient
+  connection:
+    kind: remote
+    endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
+  options:
+    temperature: 0.1
+    maxOutputTokens: 2000
+
+tools:
+  - kind: mcp
+    name: cosmosdb_tools
+    description: |
+      CosmosDB MCP server for querying subscription and tenant data.
+      Provides access to business data including subscriptions, tenants,
+      user mappings, configurations, and usage metrics.
+    url: =Env.MCP_COSMOSDB_URL
+    approvalMode:
+      kind: never
+    allowedTools:
+      - get_user_subscriptions
+      - get_subscription_details
+      - get_tenant_info
+      - get_tenant_users
+      - get_tenant_configuration
+      - query_subscriptions
+
+outputSchema:
+  properties:
+    - name: success
+      kind: boolean
+      description: Whether the data retrieval was successful
+      required: true
+    - name: error
+      kind: string
+      description: Error message if retrieval failed, null otherwise
+    - name: queryTimestamp
+      kind: string
+      description: ISO timestamp of when the query was executed
+    - name: subscriptions
+      kind: array
+      description: List of subscriptions associated with the user
+      items:
+        kind: object
+        properties:
+          - name: subscriptionId
+            kind: string
+            description: Unique subscription identifier
+          - name: subscriptionName
+            kind: string
+            description: Human-readable subscription name
+          - name: status
+            kind: string
+            description: Subscription status (active, suspended, expired, pending)
+          - name: tier
+            kind: string
+            description: Subscription tier/plan level
+          - name: startDate
+            kind: string
+            description: Subscription start date (ISO format)
+          - name: endDate
+            kind: string
+            description: Subscription end date (ISO format)
+          - name: tenantId
+            kind: string
+            description: Associated tenant ID
+          - name: tenantName
+            kind: string
+            description: Associated tenant name
+          - name: userRole
+            kind: string
+            description: User's role within this subscription
+          - name: features
+            kind: array
+            description: List of enabled features
+            items:
+              kind: string
+    - name: tenants
+      kind: array
+      description: Detailed tenant information
+      items:
+        kind: object
+        properties:
+          - name: tenantId
+            kind: string
+            description: Unique tenant identifier
+          - name: tenantName
+            kind: string
+            description: Tenant display name
+          - name: domain
+            kind: string
+            description: Primary domain for the tenant
+          - name: region
+            kind: string
+            description: Geographic region of the tenant
+          - name: createdDate
+            kind: string
+            description: Tenant creation date
+          - name: userCount
+            kind: number
+            description: Number of users in the tenant
+          - name: configuration
+            kind: object
+            description: Tenant configuration settings

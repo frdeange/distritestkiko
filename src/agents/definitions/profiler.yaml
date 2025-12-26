@@ -1,0 +1,163 @@
+# =============================================================================
+# Profiler Agent
+# =============================================================================
+# Connected to EntraID via MCP to retrieve user identity and profile information.
+# Extracts user data such as name, email, organization, roles, and permissions.
+# Always returns structured output for use by other agents in the workflow.
+#
+# Tools:
+# - mcp: EntraID MCP server for identity queries
+#
+# Output:
+# - Always returns structured JSON with user profile data
+# =============================================================================
+
+kind: Agent
+name: Profiler
+description: |
+  User profiling agent that retrieves identity and profile information from
+  EntraID. Provides structured user data to other agents for enriching their
+  operations with accurate user context.
+
+instructions: |
+  You are the Profiler agent for the DistriPartner platform. Your role is to
+  retrieve and structure user identity information from EntraID for use by
+  other agents in the workflow.
+
+  ## Your Responsibilities
+  - Query EntraID for user profile information
+  - Structure user data in a consistent, usable format
+  - Provide accurate identity information to requesting agents
+  - Handle cases where user data is incomplete or unavailable
+
+  ## Data You Can Retrieve
+  Using the EntraID MCP tools, you can retrieve:
+  - User principal name (UPN) and email
+  - Display name and full name
+  - Organization and department
+  - Job title and role
+  - Manager information
+  - Group memberships
+  - Assigned licenses
+  - Contact information (phone, address)
+  - Account status (enabled/disabled)
+  - Last sign-in information
+
+  ## Query Process
+  1. Receive a request for user information (typically by email or UPN)
+  2. Query EntraID using the MCP tools
+  3. Compile the retrieved data into structured format
+  4. Return the structured output to the requesting agent
+
+  ## Handling Missing Data
+  - If a user is not found, return an error structure indicating this
+  - If some fields are unavailable, include null values for those fields
+  - Never fabricate or guess user information
+  - Log any data retrieval issues for troubleshooting
+
+  ## Privacy and Security
+  - Only retrieve data that is necessary for the requesting operation
+  - Do not cache or store user data beyond the current request
+  - Respect data access permissions and boundaries
+  - Report any suspicious data access patterns
+
+  ## Important Guidelines
+  - Always return structured output as defined in outputSchema
+  - Validate user identifiers before querying
+  - Handle API errors gracefully with informative messages
+  - Keep responses focused on the requested data
+
+model:
+  id: =Env.MODEL_DEPLOYMENT_COMPLEX
+  provider: AzureAIClient
+  connection:
+    kind: remote
+    endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
+  options:
+    temperature: 0.1
+    maxOutputTokens: 1500
+
+tools:
+  - kind: mcp
+    name: entraid_tools
+    description: |
+      EntraID MCP server for querying user identity and profile information.
+      Provides access to Microsoft Entra ID (formerly Azure AD) user data
+      including profiles, group memberships, roles, and licenses.
+    url: =Env.MCP_ENTRAID_URL
+    approvalMode:
+      kind: never
+    allowedTools:
+      - get_user_profile
+      - get_user_groups
+      - get_user_roles
+      - get_user_licenses
+      - search_users
+
+outputSchema:
+  properties:
+    - name: success
+      kind: boolean
+      description: Whether the profile retrieval was successful
+      required: true
+    - name: error
+      kind: string
+      description: Error message if retrieval failed, null otherwise
+    - name: userProfile
+      kind: object
+      description: The retrieved user profile data
+      properties:
+        - name: userId
+          kind: string
+          description: Unique user identifier from EntraID
+        - name: userPrincipalName
+          kind: string
+          description: User principal name (UPN)
+        - name: email
+          kind: string
+          description: Primary email address
+        - name: displayName
+          kind: string
+          description: User's display name
+        - name: firstName
+          kind: string
+          description: User's first name
+        - name: lastName
+          kind: string
+          description: User's last name
+        - name: jobTitle
+          kind: string
+          description: User's job title
+        - name: department
+          kind: string
+          description: User's department
+        - name: organization
+          kind: string
+          description: User's organization/company name
+        - name: managerId
+          kind: string
+          description: Manager's user ID
+        - name: managerEmail
+          kind: string
+          description: Manager's email address
+        - name: phone
+          kind: string
+          description: User's phone number
+        - name: accountEnabled
+          kind: boolean
+          description: Whether the account is enabled
+        - name: groups
+          kind: array
+          description: List of group memberships
+          items:
+            kind: string
+        - name: roles
+          kind: array
+          description: List of assigned roles
+          items:
+            kind: string
+        - name: licenses
+          kind: array
+          description: List of assigned licenses
+          items:
+            kind: string

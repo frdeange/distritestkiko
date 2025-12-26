@@ -1,0 +1,223 @@
+# =============================================================================
+# Main Hand-Off Workflow
+# =============================================================================
+# Orchestration workflow defining the hand-off patterns between all agents.
+# The Orchestrator acts as the entry point and delegates to specialized agents
+# based on user intent. Agents can further delegate to data agents and
+# utility agents as needed.
+#
+# Workflow Architecture:
+#
+#                     ┌─────────────────┐
+#                     │   Orchestrator  │
+#                     │  (Entry Point)  │
+#                     └────────┬────────┘
+#                              │
+#               ┌──────────────┴──────────────┐
+#               ▼                             ▼
+#      ┌────────────────┐            ┌────────────────┐
+#      │    Support     │            │ CampaignManager│
+#      │  (L1 Support)  │            │  (Campaigns)   │
+#      └───────┬────────┘            └───────┬────────┘
+#              │                             │
+#              ▼                    ┌────────┴────────┐
+#      ┌────────────────┐           │                 │
+#      │   Ticketing    │           ▼                 ▼
+#      │ (Case Opening) │      ┌─────────┐     ┌─────────────┐
+#      └───────┬────────┘      │ Profiler│     │DataCollector│
+#              │               └────┬────┘     └──────┬──────┘
+#     ┌────────┴────────┐           │                 │
+#     ▼                 ▼           └────────┬────────┘
+# ┌─────────┐    ┌─────────────┐             ▼
+# │ Profiler│    │DataCollector│     ┌───────────────┐
+# └─────────┘    └─────────────┘     │ Communication │
+#                                    └───────────────┘
+#
+# =============================================================================
+
+kind: Workflow
+name: MainHandoffWorkflow
+description: |
+  Primary orchestration workflow for the DistriPartner platform.
+  Routes user requests through appropriate agent chains using hand-off patterns.
+
+# -----------------------------------------------------------------------------
+# Entry Point Configuration
+# -----------------------------------------------------------------------------
+entryPoint: orchestrator
+
+# -----------------------------------------------------------------------------
+# Agent Executors
+# Define all agents participating in the workflow
+# -----------------------------------------------------------------------------
+executors:
+  # Primary orchestrator - entry point for all user interactions
+  - name: orchestrator
+    kind: agent
+    agent:
+      path: ./definitions/orchestrator.yaml
+    description: |
+      Central orchestrator that receives user requests and routes them
+      to the appropriate specialized agent based on intent classification.
+
+  # Support pathway agents
+  - name: support
+    kind: agent
+    agent:
+      path: ./definitions/support.yaml
+    description: |
+      First-level support agent for handling user inquiries and issues.
+      Uses RAG for knowledge retrieval, escalates to ticketing when needed.
+
+  - name: ticketing
+    kind: agent
+    agent:
+      path: ./definitions/ticketing.yaml
+    description: |
+      Ticket creation agent for cases that cannot be resolved by support.
+      Coordinates with profiler and dataCollector for enriched ticket data.
+
+  # Campaign pathway agents
+  - name: campaignManager
+    kind: agent
+    agent:
+      path: ./definitions/campaignmanager.yaml
+    description: |
+      Campaign execution agent for running bulk operations on tenants.
+      Coordinates with data agents and communication for full workflow.
+
+  - name: campaignSuggestor
+    kind: agent
+    agent:
+      path: ./definitions/campaignSuggestor.yaml
+    description: |
+      [SKELETON] Future proactive agent for suggesting campaign opportunities.
+      Currently returns placeholder responses.
+
+  # Data agents - shared utilities
+  - name: profiler
+    kind: agent
+    agent:
+      path: ./definitions/profiler.yaml
+    description: |
+      User profiling agent that retrieves identity data from EntraID.
+      Returns structured output for use by other agents.
+
+  - name: dataCollector
+    kind: agent
+    agent:
+      path: ./definitions/dataCollector.yaml
+    description: |
+      Data collection agent that retrieves subscription and tenant data.
+      Returns structured output for use by other agents.
+
+  # Utility agents
+  - name: communication
+    kind: agent
+    agent:
+      path: ./definitions/communication.yaml
+    description: |
+      Communication agent for sending notifications and summaries.
+      Formats and delivers emails to relevant stakeholders.
+
+# -----------------------------------------------------------------------------
+# Hand-Off Edges
+# Define the allowed transitions between agents
+# -----------------------------------------------------------------------------
+edges:
+  # From Orchestrator - primary routing decisions
+  - source: orchestrator
+    targets:
+      - support
+      - campaignManager
+    condition: |
+      Route to 'support' for support inquiries, troubleshooting, and general help.
+      Route to 'campaignManager' for campaign operations and tenant management.
+
+  # From Support - escalation pathway
+  - source: support
+    targets:
+      - ticketing
+    condition: |
+      Escalate to 'ticketing' when unable to resolve user's issue,
+      when issue requires elevated permissions or specialist review,
+      or when user explicitly requests a support ticket.
+
+  # From Ticketing - data gathering
+  - source: ticketing
+    targets:
+      - profiler
+      - dataCollector
+    condition: |
+      Request 'profiler' for user identity and contact information.
+      Request 'dataCollector' for subscription and tenant context.
+    returnToSource: true
+
+  # From CampaignManager - data gathering and notifications
+  - source: campaignManager
+    targets:
+      - profiler
+      - dataCollector
+      - communication
+    condition: |
+      Request 'profiler' for user/owner information for targeting.
+      Request 'dataCollector' for tenant and subscription data.
+      Request 'communication' to send notifications about campaign results.
+    returnToSource: true
+
+  # Return paths to Orchestrator
+  - source: support
+    targets:
+      - orchestrator
+    condition: |
+      Return to orchestrator if user wants to switch to a different
+      type of request (e.g., from support to campaigns).
+
+  - source: campaignManager
+    targets:
+      - orchestrator
+    condition: |
+      Return to orchestrator after campaign completion or if user
+      wants to switch to a different type of request.
+
+  - source: ticketing
+    targets:
+      - orchestrator
+    condition: |
+      Return to orchestrator after ticket creation if user has
+      additional unrelated requests.
+
+# -----------------------------------------------------------------------------
+# Workflow Settings
+# -----------------------------------------------------------------------------
+settings:
+  # Maximum conversation turns before requiring re-entry
+  maxTurns: 50
+  
+  # Interaction mode for the workflow
+  interactionMode: interactive
+  
+  # Enable return to previous agent after data gathering
+  enableReturnToPrevious: true
+  
+  # Timeout for agent responses (seconds)
+  agentTimeout: 120
+  
+  # Logging level for debugging
+  logLevel: info
+
+# -----------------------------------------------------------------------------
+# Error Handling
+# -----------------------------------------------------------------------------
+errorHandling:
+  # Default behavior when an agent fails
+  onAgentError: returnToOrchestrator
+  
+  # Maximum retries for agent failures
+  maxRetries: 2
+  
+  # Fallback message when all retries exhausted
+  fallbackMessage: |
+    I apologize, but I'm experiencing technical difficulties processing
+    your request. Please try again in a few moments, or contact support
+    directly if the issue persists.
