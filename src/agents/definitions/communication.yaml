@@ -101,7 +101,7 @@ instructions: |
 
 model:
   id: =Env.MODEL_DEPLOYMENT_SIMPLE
-  provider: AzureAIClient
+  provider: AzureAIAgentClient
   connection:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT

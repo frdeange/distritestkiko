@@ -1,2 +1,3 @@
 agent-framework>=1.0.0b251223
 agent-framework-declarative>=1.0.0b251223
+azure-identity>=1.15.0
