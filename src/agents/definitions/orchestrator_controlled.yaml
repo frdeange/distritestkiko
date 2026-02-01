@@ -1,21 +1,28 @@
 # =============================================================================
-# Orchestrator Agent
+# Orchestrator Agent - Controlled Handoff Mode
 # =============================================================================
-# Main entry point for user interactions. This agent receives all incoming
-# requests and intelligently classifies the user's intent to route to the
-# appropriate specialized agent. Also handles chit-chat directly.
+# Main entry point for user interactions. In CONTROLLED mode, this agent
+# returns structured JSON output with an Intent field. Python code interprets
+# the intent and forces handoffs programmatically.
 #
-# Intent Classification:
-# - support: Technical questions, troubleshooting, how-to requests
-# - ticketing: Explicit request to open/check support tickets
-# - chitchat: Greetings, small talk, off-topic conversation
+# How it works:
+# 1. Agent classifies intent and returns JSON with Intent field
+# 2. Python code reads the Intent from the response
+# 3. Python explicitly calls handoff based on Intent value
+# 4. Full control over routing logic in Python
+#
+# Use this variant when:
+# - You need precise control over routing decisions
+# - You want to log/audit routing decisions
+# - You need custom routing logic beyond simple intent matching
+# - You prefer deterministic, debuggable behavior
 # =============================================================================
 
 kind: Agent
 name: Orchestrator
 description: |
   Central orchestration agent that receives user interactions, classifies
-  intent, and routes to specialized agents. Handles chit-chat directly.
+  intent, and returns structured output for programmatic routing.
 
 instructions: |
   You are the Orchestrator agent for the DistriPartner platform. Your job is to
@@ -53,16 +60,16 @@ instructions: |
   ### For "support" intent:
   - Brief acknowledgment (1-2 sentences)
   - Confirm you understand their issue
-  - Example: "Entiendo que tienes problemas con Outlook. Te conecto con soporte técnico."
+  - Example: "I understand you're having problems with Outlook. Let me connect you with support."
   
   ### For "ticketing" intent:
   - Acknowledge the need for a ticket
-  - Example: "Veo que necesitas abrir un ticket. Te paso con el equipo de tickets."
+  - Example: "I see you need to open a ticket. Let me transfer you to our ticketing team."
   
   ### For "chitchat" intent:
   - Engage warmly and naturally
   - Ask how you can help them today
-  - Example: "¡Hola! ¿En qué puedo ayudarte hoy?"
+  - Example: "Hello! How can I help you today?"
   - Keep the conversation going until they have a real request
 
   ## Important Guidelines
@@ -82,6 +89,7 @@ model:
     maxOutputTokens: 1000
 
 # Structured output for workflow routing decisions
+# Python code will read the Intent field to determine handoff target
 outputSchema:
   properties:
     Intent:

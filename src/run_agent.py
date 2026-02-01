@@ -31,7 +31,8 @@ from azure.identity.aio import DefaultAzureCredential
 # Available agents and their YAML files
 AGENTS_DIR = Path(__file__).parent / "agents" / "definitions"
 AVAILABLE_AGENTS = {
-    "orchestrator": "orchestrator.yaml",
+    "orchestrator-native": "orchestrator_native.yaml",
+    "orchestrator-controlled": "orchestrator_controlled.yaml",
     "support": "support.yaml",
     "ticketing": "ticketing.yaml",
     "profiler": "profiler.yaml",
@@ -144,19 +145,22 @@ async def run_agent(agent_name: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run DistriPartner declarative agents",
+        description="Run DistriPartner declarative agents individually",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run_agent.py                    # Run orchestrator (default)
-  python run_agent.py --agent support    # Run support agent
-  python run_agent.py --list             # List available agents
+  python run_agent.py                              # Run orchestrator-native (default)
+  python run_agent.py --agent support              # Run support agent
+  python run_agent.py --agent orchestrator-native  # Run native orchestrator
+  python run_agent.py --list                       # List available agents
+  
+Note: For multi-agent workflows, use run_workflow.py instead.
         """
     )
     parser.add_argument(
         "--agent", "-a",
-        default="orchestrator",
-        help="Name of the agent to run (default: orchestrator)"
+        default="orchestrator-native",
+        help="Name of the agent to run (default: orchestrator-native)"
     )
     parser.add_argument(
         "--list", "-l",

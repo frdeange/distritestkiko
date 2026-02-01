@@ -1,73 +1,101 @@
 # DistriPartner Platform
 
-A multi-agent AI platform built with **Microsoft Agent Framework** using declarative YAML-based agent definitions. The platform enables intelligent customer support, campaign management, and partner operations through a coordinated system of specialized AI agents.
+A multi-agent AI platform built with **Microsoft Agent Framework** using **declarative YAML agent definitions** and **programmatic Python workflows**. The platform enables intelligent customer support through a coordinated system of specialized AI agents using the **HandoffBuilder** pattern.
 
 ## 🎯 Objectives
 
-- **Intelligent Orchestration**: Automatically route user requests to the most appropriate specialized agent
-- **Declarative Agent Definitions**: Define agents using YAML files with PowerFx expressions for dynamic configuration
-- **Multi-Agent Workflow**: Support complex hand-off scenarios between agents
-- **Azure AI Integration**: Leverage Azure AI Foundry and Azure OpenAI for powerful LLM capabilities
-- **Scalable Architecture**: Modular design allowing easy addition of new agents and capabilities
+- **Intelligent Orchestration**: Automatically route user requests to specialized agents
+- **Declarative Agent Definitions**: Define agents using YAML files with PowerFx expressions
+- **Programmatic Workflows**: Use Python `HandoffBuilder` for reliable multi-agent orchestration
+- **Azure AI Integration**: Leverage Azure AI Foundry and Azure OpenAI for LLM capabilities
+- **Human-in-the-Loop**: Support multi-turn conversations with user interaction
+- **Scalable Architecture**: Modular design for easy addition of new agents
 
 ## 📐 Architecture
 
+The platform uses a **hybrid approach**:
+- **Declarative YAML** for agent definitions (model, instructions, tools)
+- **Programmatic Python** for workflow orchestration (`HandoffBuilder`)
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     User Interaction                         │
+│                    DistriPartner Platform                    │
+├─────────────────────────────────────────────────────────────┤
+│  src/run_workflow.py                                        │
+│  ├── --mode native    → handoff_native.py                   │
+│  └── --mode controlled → handoff_controlled.py              │
+├─────────────────────────────────────────────────────────────┤
+│                 HandoffBuilder Workflow                      │
+│                                                              │
+│     ┌───────────────┐                                       │
+│     │  ORCHESTRATOR │  (classifies user intent)             │
+│     └───────┬───────┘                                       │
+│             │                                                │
+│    ┌────────┴────────┐                                      │
+│    ▼                 ▼                                       │
+│ ┌─────────┐     ┌───────────┐                               │
+│ │ SUPPORT │────▶│ TICKETING │                               │
+│ └─────────┘     └───────────┘                               │
+│                                                              │
+├─────────────────────────────────────────────────────────────┤
+│  Agent YAML Definitions                                      │
+│  ├── orchestrator_native.yaml   (tool-call routing)         │
+│  ├── orchestrator_controlled.yaml (JSON intent routing)     │
+│  ├── support.yaml               (RAG + Microsoft Learn)     │
+│  └── ticketing.yaml             (CosmosDB + Email)          │
+├─────────────────────────────────────────────────────────────┤
+│  External Services                                           │
+│  • Azure OpenAI (GPT-4)                                      │
+│  • Azure AI Search (Vector Store for RAG)                    │
+│  • Microsoft Learn MCP Server                                │
+│  • CosmosDB MCP Server                                       │
+│  • Email MCP Server                                          │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      ORCHESTRATOR                            │
-│         (Routes requests to specialized agents)              │
-└─────────────────────────────────────────────────────────────┘
-                    │                        │
-          ┌────────┴────────┐      ┌────────┴────────┐
-          ▼                 ▼      ▼                 ▼
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│     SUPPORT     │  │ CAMPAIGN        │  │ CAMPAIGN        │
-│                 │  │ MANAGER         │  │ SUGGESTOR       │
-└─────────────────┘  └─────────────────┘  └─────────────────┘
-          │                    │
-          ▼                    ├────────────────┬───────────────┐
-┌─────────────────┐           ▼                ▼               ▼
-│   TICKETING     │  ┌─────────────────┐ ┌─────────────┐ ┌─────────────┐
-│                 │  │   PROFILER      │ │ DATA        │ │COMMUNICATION│
-└─────────────────┘  │                 │ │ COLLECTOR   │ │             │
-          │          └─────────────────┘ └─────────────┘ └─────────────┘
-          ▼
-┌─────────────────┐
-│   PROFILER /    │
-│ DATA COLLECTOR  │
-└─────────────────┘
 ```
+
+### Workflow Variants
+
+The platform supports **two workflow modes** for evaluation:
+
+| Mode | Description | Routing Mechanism |
+|------|-------------|-------------------|
+| **Native** | Decentralized routing | LLM calls `handoff_to_support()` / `handoff_to_ticketing()` tools |
+| **Controlled** | Centralized routing | LLM returns JSON with Intent, Python routes based on Intent value |
 
 ## 📁 Project Structure
 
 ```
 DistriPartnerSimplePlatform/
 ├── .devcontainer/
-│   └── devcontainer.json      # Dev Container configuration
-├── .env                        # Environment variables (create from .env.fake)
-├── .env.fake                   # Template for environment variables
-├── requirements.txt            # Python dependencies
-├── DeclarativeAgents.md        # YAML schema documentation
+│   └── devcontainer.json         # Dev Container configuration
+├── .env                           # Environment variables (create from .env.fake)
+├── .env.fake                      # Template for environment variables
+├── requirements.txt               # Python dependencies
+├── DeclarativeAgents.md           # YAML schema documentation
+├── README.md                      # This file
 ├── src/
-│   ├── run_agent.py            # Run individual agents
-│   ├── run_workflow.py         # Run multi-agent workflow
+│   ├── run_agent.py               # Run individual agents
+│   ├── run_workflow.py            # Run multi-agent workflow
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── schemas.py             # Pydantic models for responses
+│   ├── workflows/
+│   │   ├── __init__.py
+│   │   ├── agents.py              # Agent loading from YAML
+│   │   ├── common.py              # Shared utilities
+│   │   ├── handoff_native.py      # Native workflow variant
+│   │   └── handoff_controlled.py  # Controlled workflow variant
 │   └── agents/
-│       ├── definitions/        # Agent YAML definitions
-│       │   ├── orchestrator.yaml
-│       │   ├── support.yaml
-│       │   ├── ticketing.yaml
-│       │   ├── profiler.yaml
-│       │   ├── dataCollector.yaml
-│       │   ├── campaignmanager.yaml
-│       │   ├── campaignSuggestor.yaml
-│       │   └── communication.yaml
-│       └── workflow/
-│           └── main-handoff.yaml
+│       └── definitions/           # Agent YAML definitions
+│           ├── orchestrator_native.yaml
+│           ├── orchestrator_controlled.yaml
+│           ├── support.yaml
+│           ├── ticketing.yaml
+│           ├── profiler.yaml
+│           ├── dataCollector.yaml
+│           ├── campaignmanager.yaml
+│           ├── campaignSuggestor.yaml
+│           └── communication.yaml
 ```
 
 ## 🚀 Getting Started
@@ -79,206 +107,223 @@ DistriPartnerSimplePlatform/
 - **Docker** (for DevContainer)
 - **VS Code** with DevContainers extension OR **GitHub Codespaces**
 
----
+### Quick Start
 
-## 🐳 Running with DevContainer (Recommended)
-
-### Option 1: VS Code + DevContainer
-
-1. **Clone the repository**
+1. **Clone and open in container**
    ```bash
    git clone https://github.com/frdeange/distritestkiko.git
    cd DistriPartnerSimplePlatform
-   ```
-
-2. **Open in VS Code**
-   ```bash
    code .
+   # Press F1 → "Dev Containers: Reopen in Container"
    ```
 
-3. **Reopen in Container**
-   - Press `F1` or `Ctrl+Shift+P`
-   - Type: `Dev Containers: Reopen in Container`
-   - Wait for the container to build (first time takes ~5 minutes)
+2. **Configure environment**
+   ```bash
+   cp .env.fake .env
+   # Edit .env with your Azure credentials
+   ```
 
-4. **Configure environment variables** (see [Environment Configuration](#-environment-configuration))
-
-5. **Authenticate with Azure**
+3. **Authenticate with Azure**
    ```bash
    az login
    ```
 
-6. **Run the platform** (see [Execution](#-execution))
-
-### Option 2: GitHub Codespaces ☁️
-
-1. **Open in Codespaces**
-   - Go to the repository on GitHub
-   - Click the green **`<> Code`** button
-   - Select the **`Codespaces`** tab
-   - Click **`Create codespace on main`**
-
-   Or use this direct link:
-   
-   [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=frdeange/distritestkiko)
-
-2. **Wait for setup**
-   - Codespaces will automatically build the DevContainer
-   - All dependencies are installed via `postCreateCommand`
-
-3. **Configure environment variables**
+4. **Run the workflow**
    ```bash
-   cp .env.fake .env
-   # Edit .env with your values
+   cd src
+   python run_workflow.py --mode native
    ```
-
-4. **Authenticate with Azure**
-   ```bash
-   az login --use-device-code
-   ```
-
-5. **Run the platform** (see [Execution](#-execution))
-
-### DevContainer Features
-
-The DevContainer includes:
-
-| Feature | Description |
-|---------|-------------|
-| Python 3.12 | Main runtime environment |
-| Azure CLI (`az`) | Azure resource management |
-| Azure Developer CLI (`azd`) | Azure deployment automation |
-| Docker-in-Docker | Container support within the DevContainer |
-| Node.js | Frontend development support |
-| .NET 8.0 SDK | Required for PowerFx expressions |
-
----
-
-## ⚙️ Environment Configuration
-
-### Required Variables
-
-Create a `.env` file from the template:
-
-```bash
-cp .env.fake .env
-```
-
-Edit `.env` with your Azure credentials:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `AZURE_AI_PROJECT_ENDPOINT` | Azure AI Foundry project endpoint | `https://your-project.ai.azure.com` |
-| `MODEL_DEPLOYMENT_COMPLEX` | Model for complex reasoning agents | `gpt-4.1` |
-| `MODEL_DEPLOYMENT_STANDARD` | Model for standard agents | `gpt-4.1` |
-| `MODEL_DEPLOYMENT_SIMPLE` | Model for simple task agents | `gpt-4.1` |
-
-### Optional Variables (for full functionality)
-
-| Variable | Description | Used By |
-|----------|-------------|---------|
-| `AZURE_AI_SEARCH_ENDPOINT` | Azure AI Search for RAG | Support agent |
-| `AZURE_AI_SEARCH_KEY` | Search service admin key | Support agent |
-| `VECTOR_STORE_SUPPORT` | Vector store ID for knowledge base | Support agent |
-| `MCP_ENTRAID_URL` | EntraID MCP server URL | Profiler agent |
-| `MCP_COSMOSDB_URL` | CosmosDB MCP server URL | DataCollector agent |
-| `MCP_POWERSHELL_URL` | PowerShell MCP server URL | CampaignManager agent |
-| `MCP_EMAIL_URL` | Email MCP server URL | Communication agent |
-
-### Model Deployment Tiers
-
-The platform supports three model tiers for cost optimization:
-
-- **COMPLEX**: Advanced reasoning tasks (Orchestrator, Profiler) - use most capable model
-- **STANDARD**: Moderate complexity (CampaignManager, DataCollector)
-- **SIMPLE**: Straightforward tasks (Support, Ticketing, Communication)
 
 ---
 
 ## ▶️ Execution
 
-### Run a Single Agent
-
-Test individual agents in interactive mode:
+### Run the Multi-Agent Workflow
 
 ```bash
 cd src
 
-# Run the orchestrator (default)
-python run_agent.py
+# Run native mode (default) - LLM decides routing via tool calls
+python run_workflow.py
 
-# Run a specific agent
+# Run native mode with streaming responses
+python run_workflow.py --mode native --streaming
+
+# Run controlled mode - Python interprets JSON intent
+python run_workflow.py --mode controlled
+
+# Run controlled mode with streaming
+python run_workflow.py --mode controlled --streaming
+```
+
+### Run Individual Agents
+
+Test agents in isolation:
+
+```bash
+cd src
+
+# Run orchestrator (native variant)
+python run_agent.py --agent orchestrator-native
+
+# Run orchestrator (controlled variant)
+python run_agent.py --agent orchestrator-controlled
+
+# Run support agent
 python run_agent.py --agent support
+
+# Run ticketing agent
 python run_agent.py --agent ticketing
-python run_agent.py --agent profiler
 
 # List all available agents
 python run_agent.py --list
 ```
 
-### Run the Multi-Agent Workflow
-
-Execute the complete hand-off workflow with all agents:
-
-```bash
-cd src
-
-# Run interactive workflow
-python run_workflow.py
-
-# Run with debug output
-python run_workflow.py --debug
-```
-
 ### Workflow Interaction
 
 1. Type your message and press **Enter**
-2. The **Orchestrator** will analyze and route to the appropriate agent
-3. Agents will hand off to specialists as needed
-4. Say `adiós`, `gracias`, `thanks`, or `exit` to end the conversation
+2. The **Orchestrator** classifies intent and routes to the appropriate agent
+3. **Support** agent handles technical questions, can escalate to **Ticketing**
+4. **Ticketing** agent creates support tickets via CosmosDB and Email
+5. Type `quit`, `exit`, or `goodbye` to end the conversation
 
 ---
 
-## 🤖 Available Agents
+## 🤖 Agent Overview
 
-| Agent | Purpose | Hand-off Targets |
-|-------|---------|------------------|
-| **Orchestrator** | Routes requests to specialists | Support, CampaignManager |
-| **Support** | Handles support inquiries | Ticketing |
-| **Ticketing** | Manages support tickets | Profiler, DataCollector |
-| **CampaignManager** | Executes campaigns on tenants | Profiler, DataCollector, Communication, CampaignSuggestor |
-| **CampaignSuggestor** | Suggests campaign strategies | - |
-| **Profiler** | Retrieves user profile data | - |
-| **DataCollector** | Gathers tenant/subscription data | - |
-| **Communication** | Sends notifications/emails | - |
-
----
-
-## 📚 Documentation
-
-- [DeclarativeAgents.md](DeclarativeAgents.md) - Complete YAML schema documentation for Microsoft Agent Framework
+| Agent | Purpose | Tools | Hand-off Targets |
+|-------|---------|-------|------------------|
+| **Orchestrator** | Classifies intent, routes requests | - | Support, Ticketing |
+| **Support** | First-level support, RAG search | file_search, Microsoft Learn MCP | Ticketing |
+| **Ticketing** | Creates support tickets | CosmosDB MCP, Email MCP | Support |
 
 ---
 
 ## 🛠️ Development
 
-### Adding a New Agent
+### Adding a New Agent to the Workflow
 
-1. Create a new YAML file in `src/agents/definitions/`
-2. Define the agent following the schema in [DeclarativeAgents.md](DeclarativeAgents.md)
-3. Add the agent to `AVAILABLE_AGENTS` in `run_agent.py`
-4. Add the agent to `AGENT_FILES` in `run_workflow.py`
-5. Update `build_workflow()` to include hand-off routes
+1. **Create the agent YAML** in `src/agents/definitions/`:
+   ```yaml
+   kind: Agent
+   name: NewAgent
+   description: What this agent does
+   instructions: |
+     Detailed instructions for the agent...
+   model:
+     id: =Env.MODEL_DEPLOYMENT_SIMPLE
+     provider: AzureAIAgentClient
+     connection:
+       kind: remote
+       endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
+   ```
 
-### Testing Changes
+2. **Add loading function** in `src/workflows/agents.py`:
+   ```python
+   async def load_new_agent(credential: DefaultAzureCredential) -> ChatAgent:
+       return await load_agent_from_yaml("new_agent.yaml", credential)
+   ```
+
+3. **Register in HandoffBuilder** in `src/workflows/handoff_native.py`:
+   ```python
+   async def build_native_workflow(credential):
+       new_agent = await load_new_agent(credential)
+       
+       workflow = (
+           HandoffBuilder(
+               name="distripartner_native",
+               participants=[orchestrator, support, ticketing, new_agent],  # Add here
+           )
+           .with_start_agent(orchestrator)
+           .add_handoff(orchestrator, [support, ticketing, new_agent])  # Add handoff
+           .add_handoff(new_agent, [orchestrator])  # Define return path
+           .build()
+       )
+   ```
+
+4. **Update Orchestrator instructions** in `orchestrator_native.yaml`:
+   ```yaml
+   instructions: |
+     ...
+     ### handoff_to_new_agent
+     Use this tool when the user needs [describe when to use]...
+   ```
+
+5. **Add to run_agent.py** for individual testing:
+   ```python
+   AVAILABLE_AGENTS = {
+       ...
+       "new-agent": "new_agent.yaml",
+   }
+   ```
+
+### HandoffBuilder API Reference
+
+```python
+from agent_framework import HandoffBuilder
+
+workflow = (
+    HandoffBuilder(
+        name="workflow_name",
+        participants=[agent1, agent2, agent3],  # All agents in the workflow
+        description="Optional description",
+    )
+    .with_start_agent(triage_agent)  # First agent to receive messages
+    .add_handoff(source, [targets])  # Define routing paths
+    .with_termination_condition(
+        lambda conv: "welcome" in conv[-1].text.lower()  # When to stop
+    )
+    .build()
+)
+```
+
+---
+
+## ⚙️ Environment Configuration
+
+Create `.env` from template:
 
 ```bash
-# Test individual agent
-python run_agent.py --agent your_new_agent
-
-# Test in workflow context
-python run_workflow.py --debug
+cp .env.fake .env
 ```
+
+### Required Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `AZURE_AI_PROJECT_ENDPOINT` | Azure AI Foundry project endpoint | `https://your-project.ai.azure.com` |
+| `MODEL_DEPLOYMENT_COMPLEX` | Model for complex reasoning | `gpt-4.1` |
+| `MODEL_DEPLOYMENT_SIMPLE` | Model for simple tasks | `gpt-4.1` |
+
+### Optional Variables
+
+| Variable | Description | Used By |
+|----------|-------------|---------|
+| `VECTOR_STORE_SUPPORT` | Vector store ID for RAG | Support agent |
+| `MCP_LEARN_URL` | Microsoft Learn MCP URL | Support agent |
+| `MCP_COSMOSDB_URL` | CosmosDB MCP URL | Ticketing agent |
+| `MCP_EMAIL_URL` | Email MCP URL | Ticketing agent |
+
+---
+
+## 📚 Technical Details
+
+### Why Programmatic Workflows?
+
+The platform evolved from declarative YAML workflows to programmatic Python workflows because:
+
+1. **PowerFx Limitations**: The PowerFx Python wrapper has bugs with nested property access (`Local.X.Y` fails when `Y` is None)
+2. **Flexibility**: Python code allows custom routing logic, logging, and error handling
+3. **Debugging**: Easier to debug Python than declarative YAML expressions
+4. **Reliability**: HandoffBuilder is a stable, well-tested pattern
+
+### Workflow Architecture
+
+The HandoffBuilder pattern provides:
+- **Decentralized routing**: Agents decide handoffs via tool calls
+- **Human-in-the-loop**: Workflow pauses for user input
+- **Multi-turn conversations**: Full conversation history maintained
+- **Termination conditions**: Custom logic to end workflows
 
 ---
 
@@ -287,28 +332,26 @@ python run_workflow.py --debug
 ### Python Packages
 
 ```
-agent-framework>=1.0.0b251223
-agent-framework-declarative>=1.0.0b251223
+agent-framework>=1.0.0b260130
+agent-framework-declarative>=1.0.0b260130
+agent-framework-azure-ai>=1.0.0b260130
+agent-framework-azure-ai-search>=1.0.0b260130
 azure-identity>=1.15.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
 ```
 
 ### System Requirements
 
 - Python 3.12+
-- .NET 8.0 SDK (for PowerFx expressions)
+- .NET 8.0 SDK (for PowerFx expressions in YAML)
 - Azure CLI (for authentication)
 
 ---
 
 ## 🔐 Authentication
 
-The platform uses `DefaultAzureCredential` for Azure authentication, supporting:
-
-1. **Azure CLI** - Run `az login` before starting
-2. **Managed Identity** - When deployed on Azure
-3. **Environment Variables** - `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET`
-
-For local development:
+The platform uses `DefaultAzureCredential`:
 
 ```bash
 # Interactive login
