@@ -458,9 +458,72 @@ tools:
     name: string                # REQUIRED
     description: string         # OPTIONAL
     url: string                 # REQUIRED: MCP server URL
+    connection: Connection      # OPTIONAL: Connection for authentication
     approvalMode: ApprovalMode  # OPTIONAL: Approval mode
     allowedTools: list[string]  # OPTIONAL: List of allowed tools
 ```
+
+#### MCP Authentication
+
+MCP servers often require authentication. The supported authentication types are:
+
+| Type | Description | User Context Persisted? |
+|------|-------------|------------------------|
+| **Unauthenticated** | No authentication needed | No |
+| **Key-based** | API key or access token | No |
+| **Microsoft Entra – Agent Identity** | Agent's identity with RBAC | No |
+| **Microsoft Entra – Project Managed Identity** | Foundry Project's Managed Identity | No |
+| **OAuth Identity Passthrough** | User signs in and grants permissions | Yes |
+
+##### Using Project Managed Identity (Recommended for Azure)
+
+When your MCP server requires authentication with **Project Managed Identity**, you need to:
+
+1. **Create the connection in Azure AI Foundry portal** with:
+   - Authentication: Microsoft Entra
+   - Type: Project Managed Identity
+   - Audience: The scope URI (e.g., `https://cosmos.azure.com/.default`, `https://storage.azure.com/.default`)
+
+2. **Reference the connection in YAML**:
+
+```yaml
+tools:
+  - kind: mcp
+    name: cosmosdb_tools
+    description: CosmosDB MCP server for data queries
+    url: =Env.MCP_COSMOSDB_URL
+    connection:
+      kind: reference
+      name: =Env.MCP_COSMOSDB_CONNECTION_NAME  # Name of connection created in Foundry
+    approvalMode:
+      kind: never
+```
+
+##### Using API Key Authentication
+
+```yaml
+tools:
+  - kind: mcp
+    name: github_mcp
+    description: GitHub MCP server
+    url: https://api.githubcopilot.com/mcp/
+    connection:
+      kind: key
+      apiKey: =Env.GITHUB_PAT_TOKEN
+    approvalMode:
+      kind: never
+```
+
+##### Common Audience Values
+
+| Service | Audience/Scope |
+|---------|---------------|
+| Azure Cosmos DB | `https://cosmos.azure.com/.default` |
+| Azure Storage | `https://storage.azure.com/.default` |
+| Azure Search | `https://search.azure.com/.default` |
+| Microsoft Graph | `https://graph.microsoft.com/.default` |
+| Azure AI Foundry | `http://ai.azure.com` |
+| Azure Logic Apps | `https://logic.azure.com` |
 
 #### ApprovalMode - Simple Format
 

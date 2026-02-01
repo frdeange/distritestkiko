@@ -104,6 +104,9 @@ tools:
       targeted tenants for campaign execution, configuration management,
       and administrative operations.
     url: =Env.MCP_POWERSHELL_URL
+    connection:
+      kind: remote
+      name: =Env.MCP_CONNECTION_NAME
     approvalMode:
       kind: always
     allowedTools:

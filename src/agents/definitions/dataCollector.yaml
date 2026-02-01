@@ -101,15 +101,11 @@ tools:
       Provides access to business data including subscriptions, tenants,
       user mappings, configurations, and usage metrics.
     url: =Env.MCP_COSMOSDB_URL
+    connection:
+      kind: remote
+      name: =Env.MCP_CONNECTION_NAME
     approvalMode:
       kind: never
-    allowedTools:
-      - get_user_subscriptions
-      - get_subscription_details
-      - get_tenant_info
-      - get_tenant_users
-      - get_tenant_configuration
-      - query_subscriptions
 
 outputSchema:
   properties:

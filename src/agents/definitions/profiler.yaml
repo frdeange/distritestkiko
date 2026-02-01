@@ -85,14 +85,11 @@ tools:
       Provides access to Microsoft Entra ID (formerly Azure AD) user data
       including profiles, group memberships, roles, and licenses.
     url: =Env.MCP_ENTRAID_URL
+    connection:
+      kind: remote
+      name: =Env.MCP_CONNECTION_NAME
     approvalMode:
       kind: never
-    allowedTools:
-      - get_user_profile
-      - get_user_groups
-      - get_user_roles
-      - get_user_licenses
-      - search_users
 
 outputSchema:
   properties:

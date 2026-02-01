@@ -73,12 +73,58 @@ model:
     temperature: 0.5
     maxOutputTokens: 2000
 
+# Structured output for workflow routing decisions
+outputSchema:
+  properties:
+    IsResolved:
+      type: boolean
+      required: true
+      description: |
+        Whether the user's issue has been fully resolved.
+        Set to true when the user confirms satisfaction or the issue is solved.
+        Set to false while still working on the issue.
+    NeedsTicket:
+      type: boolean
+      required: true
+      description: |
+        Whether the issue requires escalation to the Ticketing agent.
+        Set to true when:
+        - Issue cannot be resolved with available documentation
+        - User explicitly requests a support ticket
+        - Multiple troubleshooting attempts have failed
+        - Issue requires specialist review or elevated permissions
+    ResolutionSummary:
+      type: string
+      required: true
+      description: |
+        Summary of the conversation and any troubleshooting steps attempted.
+        Include what was tried and the outcome. This helps Ticketing if escalated.
+    Category:
+      type: string
+      required: false
+      description: |
+        The category of the issue: "azure", "m365", "dynamics", "general"
+
+# Tools for Support agent
+# NOTE: vectorStoreIds uses hardcoded ID because =Env. expressions don't resolve for this field
 tools:
   - kind: file_search
     description: |
       Search the DistriPartner support knowledge base for documentation,
       articles, FAQs, and troubleshooting guides to help resolve user issues.
     vectorStoreIds:
-      - =Env.VECTOR_STORE_SUPPORT
+      - vs_m4aO6nUDE8FMgSRoS78QFvHg
     maximumResultCount: 10
     scoreThreshold: 0.7
+
+  - kind: mcp
+    name: learn_tools
+    description: |
+      Search official Microsoft Learn documentation for Azure, Microsoft 365,
+      and other Microsoft product documentation, tutorials, and best practices.
+    url: =Env.MCP_LEARN_URL
+    connection:
+      kind: remote
+      name: MSLearnMCP
+    approvalMode:
+      kind: never

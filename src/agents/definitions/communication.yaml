@@ -117,12 +117,8 @@ tools:
       Supports HTML and plain text emails, multiple recipients,
       attachments, and delivery tracking.
     url: =Env.MCP_EMAIL_URL
+    connection:
+      kind: remote
+      name: =Env.MCP_CONNECTION_NAME
     approvalMode:
       kind: never
-    allowedTools:
-      - send_email
-      - send_bulk_email
-      - get_delivery_status
-      - validate_email_address
-      - get_email_template
-      - render_template

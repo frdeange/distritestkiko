@@ -1,0 +1,157 @@
+# =============================================================================
+# DistriPartner Platform - Main Declarative Workflow
+# =============================================================================
+# Multi-agent orchestration workflow using declarative YAML pattern.
+# Implements the Orchestrator → Support ↔ Ticketing flow with human-in-loop
+# conversations using InvokeAzureAgent + externalLoop pattern.
+#
+# Workflow Topology:
+#
+#                     ┌─────────────────┐
+#                     │   Orchestrator  │◄────────────────────┐
+#                     │  (Entry Point)  │                     │
+#                     └────────┬────────┘                     │
+#                              │                              │
+#          ┌───────────────────┼───────────────────┐          │
+#          │                   │                   │          │
+#          ▼ "support"         │ "chitchat"        ▼          │
+# ┌────────────────┐           │          ┌────────────────┐  │
+# │    Support     │           │          │   Ticketing    │  │
+# │  (L1 Support)  │           │          │ (Ticket Open)  │  │
+# │  [externalLoop]│           │          └────────────────┘  │
+# └───────┬────────┘           │                              │
+#         │                    │ (externalLoop until          │
+#         │ NeedsTicket?       │  intent changes)             │
+#         ▼                    └──────────────────────────────┘
+# ┌────────────────┐
+# │   Ticketing    │
+# │  (escalation)  │
+# └────────────────┘
+#
+# Usage:
+#   python run_declarative_workflow.py
+#
+# =============================================================================
+
+kind: Workflow
+name: DistriPartnerWorkflow
+description: |
+  Primary orchestration workflow for the DistriPartner platform.
+  Routes user requests through appropriate agent chains using declarative
+  multi-agent patterns with human-in-the-loop conversations.
+
+trigger:
+  kind: OnConversationStart
+  id: main_workflow
+  actions:
+
+    # =========================================================================
+    # Step 1: Orchestrator - Initial intent classification
+    # =========================================================================
+    - kind: InvokeAzureAgent
+      id: orchestrator_classify
+      conversationId: =System.ConversationId
+      agent:
+        name: Orchestrator
+      output:
+        autoSend: true
+        responseObject: Local.OrchestratorResponse
+
+    # =========================================================================
+    # Step 2: Route based on classified intent using Switch
+    # =========================================================================
+    - kind: Switch
+      id: route_by_intent
+      value: =Local.OrchestratorResponse.Intent
+      cases:
+        # ---------------------------------------------------------------------
+        # Case: SUPPORT - Multi-turn L1 support conversation
+        # ---------------------------------------------------------------------
+        - match: "support"
+          actions:
+            # Support agent with externalLoop for multi-turn conversation
+            - kind: InvokeAzureAgent
+              id: support_conversation
+              conversationId: =System.ConversationId
+              agent:
+                name: Support
+              input:
+                externalLoop:
+                  # Continue loop while: NOT resolved AND NOT needs ticket
+                  when: =Not(Local.SupportResponse.IsResolved) And Not(Local.SupportResponse.NeedsTicket)
+                  maxIterations: 50
+              output:
+                autoSend: true
+                responseObject: Local.SupportResponse
+            
+            # After Support loop exits, check if escalation to Ticketing is needed
+            - kind: If
+              id: check_needs_ticket
+              condition: =Local.SupportResponse.NeedsTicket = true
+              actions:
+                - kind: InvokeAzureAgent
+                  id: ticketing_from_support
+                  conversationId: =System.ConversationId
+                  agent:
+                    name: Ticketing
+                  output:
+                    autoSend: true
+
+        # ---------------------------------------------------------------------
+        # Case: TICKETING - Direct ticket creation
+        # ---------------------------------------------------------------------
+        - match: "ticketing"
+          actions:
+            - kind: InvokeAzureAgent
+              id: direct_ticketing
+              conversationId: =System.ConversationId
+              agent:
+                name: Ticketing
+              output:
+                autoSend: true
+
+        # ---------------------------------------------------------------------
+        # Case: CHITCHAT - Orchestrator handles directly with loop
+        # ---------------------------------------------------------------------
+        - match: "chitchat"
+          actions:
+            # Orchestrator continues chit-chat until intent changes
+            - kind: InvokeAzureAgent
+              id: chitchat_loop
+              conversationId: =System.ConversationId
+              agent:
+                name: Orchestrator
+              input:
+                externalLoop:
+                  # Continue while still chitchat intent
+                  when: =Local.OrchestratorResponse.Intent = "chitchat"
+                  maxIterations: 20
+              output:
+                autoSend: true
+                responseObject: Local.OrchestratorResponse
+            
+            # When intent changes from chitchat, route to new intent
+            - kind: GotoAction
+              id: reroute_after_chitchat
+              actionId: route_by_intent_eval
+
+      # Default case: Unknown intent, treat as support
+      default:
+        - kind: InvokeAzureAgent
+          id: default_support
+          conversationId: =System.ConversationId
+          agent:
+            name: Support
+          input:
+            externalLoop:
+              when: =Not(Local.SupportResponse.IsResolved) And Not(Local.SupportResponse.NeedsTicket)
+              maxIterations: 50
+          output:
+            autoSend: true
+            responseObject: Local.SupportResponse
+
+    # =========================================================================
+    # Step 3: End Workflow
+    # =========================================================================
+    - kind: EndWorkflow
+      id: workflow_complete
