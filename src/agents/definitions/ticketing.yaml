@@ -19,7 +19,7 @@
 # - Confirmation to user with ticket ID
 # =============================================================================
 
-kind: Agent
+kind: Prompt
 name: Ticketing
 description: |
   Conversational support ticket agent that gathers issue information through
@@ -74,10 +74,25 @@ instructions: |
   - **Medium**: Feature not working as expected, workaround available
   - **Low**: Minor issues, questions, enhancement requests
 
-  ### Step 5: Coordinate with Other Agents
-  Once you have the user's email:
-  - Hand off to PROFILER to get: display name, domain, organization
-  - Hand off to DATACOLLECTOR to get: subscription ID, tenant information
+  ### Step 5: Use Provided Context Data
+
+  The workflow system automatically provides you with data from other agents.
+  When available, this data is passed to you as context arguments:
+
+  **IssueDescription**: Summary of the issue from the Support agent or Orchestrator.
+  Use this to pre-populate the ticket description if available.
+
+  **UserProfile**: User identity data retrieved from EntraID by the Profiler agent.
+  Contains: display name, email, domain, organization, job title, etc.
+  Use this to fill in the Customer Information section of the ticket.
+
+  **SubscriptionData**: Subscription and tenant data from CosmosDB by the DataCollector.
+  Contains: subscription ID, tenant ID, tenant name, domain, region, etc.
+  Use this to fill in the subscription-related fields of the ticket.
+
+  If any of this data is not provided, ask the user for the missing information.
+  The workflow system handles all agent coordination - you just focus on creating
+  the ticket with the data you have.
 
   ### Step 6: Create the Ticket
   Generate a ticket ID in format: TKT-YYYYMMDD-XXXX (where XXXX is a random 4-digit number)
@@ -89,7 +104,7 @@ instructions: |
   - Partition key: the productFamily value (Azure, M365, or Dynamics)
 
   ### Step 7: Send Email Notification
-  Send a formatted email using email_tools with:
+  Send a formatted email using your email_tools with:
   - From: DoNotReply@70eb07c0-5e5c-446d-85cf-4187bc3dbabc.azurecomm.net
   - To: frdeange@microsoft.com, francas@microsoft.com
   - Subject: [SUPPORT TICKET] {ProductFamily} - {Priority} - {Brief Summary}
@@ -194,7 +209,6 @@ instructions: |
 
 model:
   id: =Env.MODEL_DEPLOYMENT_SIMPLE
-  provider: AzureAIAgentClient
   connection:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
@@ -205,6 +219,13 @@ model:
 # Structured output for workflow decisions
 outputSchema:
   properties:
+    Response:
+      type: string
+      required: true
+      description: |
+        The natural-language message to show the user.
+        Provides status updates, asks for missing info, or
+        confirms ticket creation. Must be in the user's language.
     TicketCreated:
       type: boolean
       required: true

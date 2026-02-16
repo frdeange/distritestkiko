@@ -15,7 +15,7 @@
 # - Always returns structured JSON with subscription and tenant data
 # =============================================================================
 
-kind: Agent
+kind: Prompt
 name: DataCollector
 description: |
   Data collection agent that retrieves subscription and tenant information from
@@ -82,10 +82,11 @@ instructions: |
   - Validate input user data before querying
   - Handle API errors gracefully with informative messages
   - Keep responses focused on the requested data
+  - The workflow system handles all agent coordination and routing
+  - You do not need to call any handoff tools - just retrieve and return data
 
 model:
   id: =Env.MODEL_DEPLOYMENT_STANDARD
-  provider: AzureAIAgentClient
   connection:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT

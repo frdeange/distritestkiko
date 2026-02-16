@@ -5,14 +5,18 @@
 # combined with RAG-based retrieval from Azure AI Search. When unable to resolve
 # an issue, this agent escalates to the Ticketing agent to open a support case.
 #
+# Data Sources:
+# - Azure AI Search: RAG retrieval from support-knowledge-base index
+#   Configured via model.options.additionalProperties.data_sources
+#
 # Tools:
-# - file_search: RAG retrieval from Azure AI Search knowledge base
+# - Microsoft Learn MCP: Official Microsoft documentation search
 #
 # Escalation:
 # - Ticketing: When unable to resolve the user's issue
 # =============================================================================
 
-kind: Agent
+kind: Prompt
 name: Support
 description: |
   First-level support agent that resolves user inquiries using knowledge base
@@ -30,10 +34,11 @@ instructions: |
   - Guide users through common procedures and workflows
 
   ## Using the Knowledge Base
-  - Always search the knowledge base first when answering questions
-  - Use the file_search tool to find relevant documentation
+  - The knowledge base is automatically available through Azure AI Search
+  - Your responses will include relevant documentation from the support KB
   - Cite specific articles or documents when providing answers
   - Combine knowledge base information with your general understanding
+  - Use Microsoft Learn MCP for official Microsoft documentation
 
   ## Resolution Process
   1. Understand the user's question or issue clearly
@@ -43,7 +48,7 @@ instructions: |
   5. Verify the user is satisfied with the resolution
 
   ## Escalation to Ticketing
-  You must escalate to the TICKETING agent when:
+  Indicate that escalation is needed (set NeedsTicket to true) when:
   - The issue cannot be resolved with available documentation
   - The user requires actions that need elevated permissions
   - The problem is a bug or system issue requiring investigation
@@ -51,11 +56,11 @@ instructions: |
   - Multiple troubleshooting attempts have failed
   - The issue requires human intervention or specialist review
 
-  When escalating:
-  - Summarize all troubleshooting steps already attempted
+  When indicating escalation is needed:
+  - Summarize all troubleshooting steps already attempted in ResolutionSummary
   - Clearly describe the issue and its impact
   - Include any error messages or relevant details
-  - Hand off gracefully without making the user repeat information
+  - The workflow system will automatically route to Ticketing
 
   ## Important Guidelines
   - Be patient and empathetic with users
@@ -65,17 +70,36 @@ instructions: |
 
 model:
   id: =Env.MODEL_DEPLOYMENT_SIMPLE
-  provider: AzureAIAgentClient
   connection:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
   options:
     temperature: 0.5
     maxOutputTokens: 2000
+    additionalProperties:
+      data_sources:
+        - type: azure_search
+          parameters:
+            endpoint: =Env.AZURE_AI_SEARCH_ENDPOINT
+            index_name: =Env.AZURE_AI_SEARCH_INDEX
+            authentication:
+              type: api_key
+              key: =Env.AZURE_AI_SEARCH_KEY
+            query_type: simple
+            top_n_documents: 5
+            in_scope: true
+            strictness: 3
 
 # Structured output for workflow routing decisions
 outputSchema:
   properties:
+    Response:
+      type: string
+      required: true
+      description: |
+        The natural-language message to show the user.
+        Contains troubleshooting guidance, follow-up questions,
+        or resolution confirmation. Must be in the user's language.
     IsResolved:
       type: boolean
       required: true
@@ -106,17 +130,8 @@ outputSchema:
         The category of the issue: "azure", "m365", "dynamics", "general"
 
 # Tools for Support agent
-# NOTE: vectorStoreIds uses hardcoded ID because =Env. expressions don't resolve for this field
+# NOTE: Knowledge base is accessed via Azure AI Search data_sources in model.options
 tools:
-  - kind: file_search
-    description: |
-      Search the DistriPartner support knowledge base for documentation,
-      articles, FAQs, and troubleshooting guides to help resolve user issues.
-    vectorStoreIds:
-      - vs_m4aO6nUDE8FMgSRoS78QFvHg
-    maximumResultCount: 10
-    scoreThreshold: 0.7
-
   - kind: mcp
     name: learn_tools
     description: |

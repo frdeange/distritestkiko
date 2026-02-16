@@ -1,0 +1,192 @@
+# =============================================================================
+# DistriPartner Platform - Declarative Workflow Definition
+# =============================================================================
+# Defines the multi-agent support workflow using the declarative YAML format.
+# Based on the Microsoft Agent Framework's customer_support sample pattern.
+#
+# Flow:
+#   1. Orchestrator classifies user intent (support/ticketing/chitchat)
+#   2. Support agent handles troubleshooting (with externalLoop for multi-turn)
+#   3. If unresolved, Profiler + DataCollector gather user/subscription data
+#   4. Ticketing agent creates the support ticket
+#   5. Communication agent sends email notification
+#
+# Agents are registered by name in WorkflowFactory and referenced here.
+# Routing is controlled by ConditionGroup based on structured agent output.
+# =============================================================================
+
+kind: Workflow
+trigger:
+  kind: OnConversationStart
+  id: distripartner_workflow
+  actions:
+
+    # ══════════════════════════════════════════════════════════════
+    # Step 1: Orchestrator classifies user intent
+    # ══════════════════════════════════════════════════════════════
+    # The Orchestrator talks to the user until it can classify the intent.
+    # While intent is "chitchat", it keeps looping (engaging in conversation).
+    # Once intent is "support" or "ticketing", it exits the loop.
+    - kind: InvokeAzureAgent
+      id: orchestrate
+      conversationId: =System.ConversationId
+      agent:
+        name: Orchestrator
+      input:
+        externalLoop:
+          when: |-
+            =Local.OrchestratorOutput.Intent = "chitchat"
+            Or
+            Not(Local.OrchestratorOutput.IntentClassified)
+      output:
+        responseObject: Local.OrchestratorOutput
+
+    # ══════════════════════════════════════════════════════════════
+    # Step 2: Route based on classified intent
+    # ══════════════════════════════════════════════════════════════
+    - kind: ConditionGroup
+      id: route_by_intent
+      conditions:
+
+        # ── SUPPORT ROUTE ──────────────────────────────────────
+        - condition: =Local.OrchestratorOutput.Intent = "support"
+          id: route_to_support
+          actions:
+
+            # Support agent works with user until resolved or needs ticket
+            - kind: InvokeAzureAgent
+              id: support_agent
+              conversationId: =System.ConversationId
+              agent:
+                name: Support
+              input:
+                externalLoop:
+                  when: |-
+                    =Not(Local.SupportOutput.IsResolved)
+                    And
+                    Not(Local.SupportOutput.NeedsTicket)
+              output:
+                responseObject: Local.SupportOutput
+
+            # If Support resolved the issue, we're done
+            - kind: ConditionGroup
+              id: check_support_resolution
+              conditions:
+                - condition: =Local.SupportOutput.IsResolved
+                  id: support_resolved
+                  actions:
+                    - kind: GotoAction
+                      id: go_to_end_resolved
+                      actionId: all_done
+
+            # Issue not resolved - capture summary for ticketing
+            - kind: SetVariable
+              id: capture_support_summary
+              variable: Local.IssueSummary
+              value: =Local.SupportOutput.ResolutionSummary
+
+            # Fall through to ticketing steps below
+
+        # ── TICKETING ROUTE (direct) ───────────────────────────
+        - condition: =Local.OrchestratorOutput.Intent = "ticketing"
+          id: route_to_ticketing_direct
+          actions:
+            - kind: SetVariable
+              id: capture_direct_summary
+              variable: Local.IssueSummary
+              value: =Local.OrchestratorOutput.Summary
+
+    # ══════════════════════════════════════════════════════════════
+    # Step 3: Gather user profile data (Profiler)
+    # ══════════════════════════════════════════════════════════════
+    # Profiler runs in its own conversation to avoid mixing contexts
+    - kind: CreateConversation
+      id: profiler_conversation
+      conversationId: Local.ProfilerConversationId
+
+    - kind: InvokeAzureAgent
+      id: profiler_agent
+      conversationId: =Local.ProfilerConversationId
+      agent:
+        name: Profiler
+      input:
+        messages: =UserMessage(Local.IssueSummary)
+      output:
+        responseObject: Local.ProfilerOutput
+
+    # ══════════════════════════════════════════════════════════════
+    # Step 4: Gather subscription data (DataCollector)
+    # ══════════════════════════════════════════════════════════════
+    - kind: CreateConversation
+      id: datacollector_conversation
+      conversationId: Local.DataCollectorConversationId
+
+    - kind: InvokeAzureAgent
+      id: datacollector_agent
+      conversationId: =Local.DataCollectorConversationId
+      agent:
+        name: DataCollector
+      input:
+        messages: =UserMessage(Local.IssueSummary)
+      output:
+        responseObject: Local.DataCollectorOutput
+
+    # ══════════════════════════════════════════════════════════════
+    # Step 5: Create ticket (Ticketing)
+    # ══════════════════════════════════════════════════════════════
+    # Ticketing agent runs in the main conversation (multi-turn with user).
+    # It receives context from Profiler and DataCollector via arguments.
+    # Loops until the ticket is created successfully.
+    - kind: InvokeAzureAgent
+      id: ticketing_agent
+      conversationId: =System.ConversationId
+      agent:
+        name: Ticketing
+      input:
+        arguments:
+          IssueDescription: =Local.IssueSummary
+          UserProfile: =Local.ProfilerOutput
+          SubscriptionData: =Local.DataCollectorOutput
+        externalLoop:
+          when: =Not(Local.TicketOutput.TicketCreated)
+      output:
+        responseObject: Local.TicketOutput
+
+    # Notify user of ticket creation
+    - kind: SendActivity
+      id: log_ticket
+      activity: "Ticket #{Local.TicketOutput.TicketId} created successfully."
+
+    # ══════════════════════════════════════════════════════════════
+    # Step 6: Send email notification (Communication)
+    # ══════════════════════════════════════════════════════════════
+    - kind: ConditionGroup
+      id: check_ticket_created
+      conditions:
+        - condition: =Local.TicketOutput.TicketCreated
+          id: ticket_created_ok
+          actions:
+            - kind: CreateConversation
+              id: communication_conversation
+              conversationId: Local.CommConversationId
+
+            - kind: InvokeAzureAgent
+              id: communication_agent
+              conversationId: =Local.CommConversationId
+              agent:
+                name: Communication
+              input:
+                arguments:
+                  TicketId: =Local.TicketOutput.TicketId
+                  TicketSummary: =Local.TicketOutput.Summary
+                  IssueDescription: =Local.IssueSummary
+                  ProductFamily: =Local.TicketOutput.ProductFamily
+                  Priority: =Local.TicketOutput.Priority
+              output:
+                responseObject: Local.CommOutput
+
+    # ══════════════════════════════════════════════════════════════
+    # End
+    # ══════════════════════════════════════════════════════════════
+    - kind: EndWorkflow
+      id: all_done

@@ -10,7 +10,7 @@
 #   python run_agent.py --list             # List available agents
 #
 # Requirements:
-#   - Copy .env.fake to .env and fill in your Azure AI credentials
+#   - Copy .env.example to .env and fill in your Azure AI credentials
 #   - Run: az login (for Azure CLI authentication)
 #   - Install: pip install -r requirements.txt
 # =============================================================================
@@ -31,14 +31,11 @@ from azure.identity.aio import DefaultAzureCredential
 # Available agents and their YAML files
 AGENTS_DIR = Path(__file__).parent / "agents" / "definitions"
 AVAILABLE_AGENTS = {
-    "orchestrator-native": "orchestrator_native.yaml",
-    "orchestrator-controlled": "orchestrator_controlled.yaml",
+    "orchestrator": "orchestrator_controlled.yaml",
     "support": "support.yaml",
     "ticketing": "ticketing.yaml",
     "profiler": "profiler.yaml",
     "datacollector": "dataCollector.yaml",
-    "campaignmanager": "campaignmanager.yaml",
-    "campaignsuggestor": "campaignSuggestor.yaml",
     "communication": "communication.yaml",
 }
 
@@ -83,7 +80,7 @@ async def run_agent(agent_name: str):
         print(f"\n❌ Missing required environment variables:")
         for var in missing_vars:
             print(f"   - {var}")
-        print("\n💡 Copy .env.fake to .env and fill in your values.")
+        print("\n💡 Copy .env.example to .env and fill in your values.")
         return
     
     # Create credential for Azure authentication
@@ -134,7 +131,7 @@ async def run_agent(agent_name: str):
     except Exception as e:
         print(f"\n❌ Error loading agent: {e}")
         print("\n💡 Make sure you have:")
-        print("   1. Copied .env.fake to .env with valid credentials")
+        print("   1. Copied .env.example to .env with valid credentials")
         print("   2. Logged in with: az login")
         print("   3. Installed requirements: pip install -r requirements.txt")
         raise
@@ -149,18 +146,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run_agent.py                              # Run orchestrator-native (default)
-  python run_agent.py --agent support              # Run support agent
-  python run_agent.py --agent orchestrator-native  # Run native orchestrator
-  python run_agent.py --list                       # List available agents
-  
+  python run_agent.py                     # Run orchestrator (default)
+  python run_agent.py --agent support     # Run support agent
+  python run_agent.py --agent ticketing   # Run ticketing agent
+  python run_agent.py --list              # List available agents
+
 Note: For multi-agent workflows, use run_workflow.py instead.
         """
     )
     parser.add_argument(
         "--agent", "-a",
-        default="orchestrator-native",
-        help="Name of the agent to run (default: orchestrator-native)"
+        default="orchestrator",
+        help="Name of the agent to run (default: orchestrator)"
     )
     parser.add_argument(
         "--list", "-l",

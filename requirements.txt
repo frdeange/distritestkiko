@@ -1,2 +1,5 @@
-agent-framework==1.0.0b260130
-agent-framework-declarative==1.0.0b260130
+# Agent Framework - installed from GitHub main branch for latest changes
+# pip install "agent-framework @ git+https://github.com/microsoft/agent-framework.git@main#subdirectory=python"
+agent-framework @ git+https://github.com/microsoft/agent-framework.git@main#subdirectory=python
+agent-framework-declarative @ git+https://github.com/microsoft/agent-framework.git@main#subdirectory=python/packages/declarative
+agent-framework-azure-ai @ git+https://github.com/microsoft/agent-framework.git@main#subdirectory=python/packages/azure-ai

@@ -1,17 +1,17 @@
 # DistriPartner Platform - Architecture Reference
 
-This document describes the architecture of the DistriPartner Platform, a multi-agent system built with Microsoft Agent Framework using **declarative YAML agent definitions** and **programmatic Python workflows**.
+This document describes the architecture of the DistriPartner Platform, a multi-agent system built with Microsoft Agent Framework using **declarative YAML-defined workflows** and **AzureOpenAIResponsesClient** for agent orchestration.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Architecture Decision: Hybrid Approach](#architecture-decision-hybrid-approach)
-- [Workflow Architecture](#workflow-architecture)
-- [HandoffBuilder Pattern](#handoffbuilder-pattern)
+- [Architecture: Declarative Workflow](#architecture-declarative-workflow)
+- [Workflow Flow](#workflow-flow)
 - [Agent Definitions](#agent-definitions)
-- [Workflow Variants](#workflow-variants)
+- [Structured Output & Routing](#structured-output--routing)
+- [MCP Tool Integration](#mcp-tool-integration)
 - [Adding New Agents](#adding-new-agents)
-- [Human-in-the-Loop Pattern](#human-in-the-loop-pattern)
+- [Entry Points](#entry-points)
 - [Folder Structure](#folder-structure)
 - [Troubleshooting](#troubleshooting)
 
@@ -21,152 +21,142 @@ This document describes the architecture of the DistriPartner Platform, a multi-
 
 DistriPartner Platform is a customer support system that uses multiple specialized AI agents to handle user requests. The system uses:
 
-- **Declarative YAML** for agent definitions (model, instructions, tools, output schemas)
-- **Programmatic Python** for workflow orchestration using `HandoffBuilder`
-- **Azure AI Foundry** for LLM capabilities
-- **MCP (Model Context Protocol)** for external tool integration
+- **AzureOpenAIResponsesClient** for creating agents (recommended by Microsoft for orchestrations)
+- **WorkflowFactory** for loading declarative YAML workflow definitions
+- **Pydantic models** for structured output (`response_format`) enabling PowerFx condition evaluation
+- **MCP (Model Context Protocol)** for external tool integration (CosmosDB, EntraID, Email, Microsoft Learn)
 
 ### Key Principles
 
-1. **Hybrid Approach**: YAML for agents, Python for workflows
-2. **Separation of Concerns**: Each agent has a specific responsibility
-3. **HandoffBuilder Pattern**: Decentralized routing where agents decide handoffs
-4. **Human-in-the-Loop**: Workflows support multi-turn conversations
+1. **Declarative Routing**: Workflow orchestration defined in YAML with ConditionGroup and PowerFx expressions
+2. **Structured Output**: All workflow agents return Pydantic-validated JSON for deterministic routing
+3. **Separation of Concerns**: Each agent has a specific responsibility (YAML instructions + tools)
+4. **Human-in-the-Loop**: Multi-turn conversations via `externalLoop` in the workflow YAML
+5. **Cost Optimization**: Three model tiers (complex, standard, simple) assigned per agent
 
 ---
 
-## Architecture Decision: Hybrid Approach
+## Architecture: Declarative Workflow
 
-### Why Not Fully Declarative Workflows?
+The platform uses the **Declarative Workflow** pattern based on guidance from the Microsoft Agent Framework team ([Issue #3713](https://github.com/microsoft/agent-framework/issues/3713)).
 
-The platform initially used fully declarative YAML workflows, but encountered issues:
-
-1. **PowerFx Limitations**: The Python PowerFx wrapper has bugs with nested property access:
-   - `Local.OrchestratorResponse.Intent` fails when `OrchestratorResponse` is `None`
-   - Error: "Deprecated use of '.'. Please use the 'ShowColumns' function instead."
-
-2. **Debugging Difficulty**: Declarative workflows are hard to debug when issues arise
-
-3. **Limited Flexibility**: Custom routing logic requires PowerFx expressions
-
-### The Hybrid Solution
+### How It Works
 
 ```
-┌───────────────────────────────────────────────────────────┐
-│  DECLARATIVE (YAML)            │  PROGRAMMATIC (Python)   │
-├───────────────────────────────────────────────────────────┤
-│  • Agent definitions            │  • Workflow orchestration │
-│  • Model configuration          │  • Routing logic          │
-│  • Instructions                 │  • Event handling         │
-│  • Tools (MCP, file_search)     │  • Termination conditions │
-│  • Output schemas               │  • Human-in-the-loop      │
-└───────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                     DECLARATIVE (YAML)                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  workflow.yaml         → Routing, conditions, loops, agent order    │
+│  Agent YAML files      → Instructions, tools, output schemas        │
+├─────────────────────────────────────────────────────────────────────┤
+│                     PYTHON GLUE                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│  declarative.py        → Agent creation, MCP setup, workflow I/O    │
+│  response_models.py    → Pydantic models for structured output      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Benefits:**
-- Agents remain declarative (easy to modify without code changes)
-- Workflows are reliable and debuggable
-- Full control over routing decisions
-- Easier error handling and logging
+### Key Components
+
+| Component | Purpose |
+|-----------|---------|
+| `AzureOpenAIResponsesClient` | Creates agents using Azure AI Foundry project endpoint |
+| `WorkflowFactory` | Loads workflow definition from YAML |
+| `InvokeAzureAgent` | YAML action that invokes an agent by name |
+| `ConditionGroup` | YAML action for PowerFx-based routing |
+| `externalLoop` | YAML input config for multi-turn user conversations |
+| `response_format` | Pydantic model enabling structured JSON output |
 
 ---
 
-## Workflow Architecture
+## Workflow Flow
 
-### Current Implementation: Support Flow
+### Support & Ticketing Flow
 
 ```
                     ┌─────────────────┐
-                    │   Orchestrator  │
-                    │  (Entry Point)  │
+                    │   Orchestrator   │ ◄── externalLoop (chitchat)
+                    │  (Intent Class.) │
                     └────────┬────────┘
                              │
               ┌──────────────┼──────────────┐
-              │              │              │
-              ▼              │              ▼
-     ┌────────────────┐      │     ┌────────────────┐
-     │    Support     │◄─────┘     │   Ticketing    │
-     │  (L1 Support)  │            │ (Ticket Open)  │
-     └───────┬────────┘            └────────────────┘
-             │                              ▲
-             │ (cannot resolve /            │
-             │  needs ticket)               │
-             └──────────────────────────────┘
+              │ intent=support              │ intent=ticketing
+              ▼                              │
+     ┌────────────────┐                      │
+     │    Support      │ ◄── externalLoop    │
+     │  (L1 Troublesh.)│   (not resolved     │
+     └───────┬────────┘    & not needs_ticket)│
+             │                               │
+     ┌───────┴───────┐                       │
+     │ IsResolved?   │                       │
+     │  ├─ YES → END │                       │
+     │  └─ NO  ──────┼───────────────────────┘
+     │               │
+     └───────────────┘
+              │
+     ┌────────┴────────┐     ┌────────────────┐
+     │    Profiler      │     │  DataCollector  │
+     │  (EntraID user)  │     │ (CosmosDB subs) │
+     └────────┬────────┘     └────────┬────────┘
+              │                       │
+              └───────────┬───────────┘
+                          │
+                 ┌────────┴────────┐
+                 │    Ticketing     │ ◄── externalLoop (ticket not created)
+                 │ (Create ticket)  │
+                 └────────┬────────┘
+                          │
+                 ┌────────┴────────┐
+                 │  Communication   │
+                 │  (Email notify)  │
+                 └─────────────────┘
 ```
 
 ### Routing Logic
 
-| From | To | Condition |
-|------|-----|-----------|
-| Orchestrator | Support | User has technical questions, needs help |
-| Orchestrator | Ticketing | User explicitly requests a ticket |
-| Support | Ticketing | `NeedsTicket = true` - Cannot resolve, needs escalation |
-| Any | End | Termination condition met (e.g., "you're welcome") |
-
----
-
-## HandoffBuilder Pattern
-
-The `HandoffBuilder` is the core of the programmatic workflow. It creates a workflow where agents can hand off control to each other via tool calls.
-
-### How It Works
-
-1. **HandoffBuilder** automatically creates `handoff_to_*()` tools for each agent
-2. When an agent calls `handoff_to_support()`, control transfers to Support
-3. The entire conversation history is maintained across handoffs
-4. Human-in-the-loop: workflow pauses for user input when needed
-
-### Code Example
-
-```python
-from agent_framework import HandoffBuilder
-
-workflow = (
-    HandoffBuilder(
-        name="distripartner_workflow",
-        participants=[orchestrator, support, ticketing],
-    )
-    .with_start_agent(orchestrator)       # Entry point
-    .add_handoff(orchestrator, [support, ticketing])  # Orchestrator can route to these
-    .add_handoff(support, [ticketing])    # Support can escalate to Ticketing
-    .with_termination_condition(
-        lambda conv: "welcome" in conv[-1].text.lower()  # Natural end
-    )
-    .build()
-)
-```
-
-### Key Methods
-
-| Method | Purpose |
-|--------|---------|
-| `participants([...])` | Register all agents in the workflow |
-| `with_start_agent(agent)` | Set the entry point agent |
-| `add_handoff(source, [targets])` | Define routing paths |
-| `with_termination_condition(fn)` | Custom termination logic |
-| `build()` | Create the Workflow instance |
+| Step | From | To | Condition (PowerFx) |
+|------|------|----|---------------------|
+| 1 | User | Orchestrator | `OnConversationStart` |
+| 1a | Orchestrator | Orchestrator (loop) | `Intent = "chitchat" Or Not(IntentClassified)` |
+| 2a | Orchestrator | Support | `Intent = "support"` |
+| 2b | Orchestrator | Ticketing Steps | `Intent = "ticketing"` |
+| 3 | Support | Support (loop) | `Not(IsResolved) And Not(NeedsTicket)` |
+| 3a | Support | END | `IsResolved = true` |
+| 3b | Support | Profiler + DataCollector | `NeedsTicket = true` |
+| 4 | Profiler/DataCollector | Ticketing | Always (sequential) |
+| 5 | Ticketing | Ticketing (loop) | `Not(TicketCreated)` |
+| 6 | Ticketing | Communication | `TicketCreated = true` |
 
 ---
 
 ## Agent Definitions
 
+All agents are defined in `src/agents/definitions/` as YAML files.
+
+### Current Agents
+
+| Agent | File | Model Tier | Tools | Purpose |
+|-------|------|-----------|-------|---------|
+| Orchestrator | `orchestrator_controlled.yaml` | Complex | None | Classifies user intent into support/ticketing/chitchat |
+| Support | `support.yaml` | Simple | Microsoft Learn MCP | First-level troubleshooting with RAG |
+| Profiler | `profiler.yaml` | Complex | EntraID MCP | Retrieves user identity from Entra ID |
+| DataCollector | `dataCollector.yaml` | Standard | CosmosDB MCP | Retrieves subscription/tenant data |
+| Ticketing | `ticketing.yaml` | Simple | CosmosDB MCP, Email MCP | Creates support tickets, stores in CosmosDB |
+| Communication | `communication.yaml` | Simple | Email MCP | Sends email notifications to support team |
+
 ### Agent YAML Structure
 
-All agents follow this structure in `src/agents/definitions/`:
-
 ```yaml
-kind: Agent
+kind: Prompt
 name: AgentName
 description: |
   Brief description of the agent's purpose.
 
 instructions: |
   Detailed instructions for the agent's behavior.
-  Include: responsibilities, guidelines, escalation rules.
 
 model:
   id: =Env.MODEL_DEPLOYMENT_SIMPLE    # or _STANDARD, _COMPLEX
-  provider: AzureAIAgentClient
   connection:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
@@ -174,7 +164,6 @@ model:
     temperature: 0.3
     maxOutputTokens: 2000
 
-# Structured output (optional, used in Controlled mode)
 outputSchema:
   properties:
     PropertyName:
@@ -183,76 +172,73 @@ outputSchema:
       description: |
         Description of what this property represents.
 
-# Tools (optional)
 tools:
-  - kind: file_search
-    vectorStoreIds:
-      - vs_xxx
   - kind: mcp
     name: tool_name
     url: =Env.MCP_URL
+    connection:
+      kind: remote
+      name: =Env.MCP_CONNECTION_NAME
+    approvalMode:
+      kind: never
 ```
-
-### Current Agents
-
-| Agent | File | Purpose |
-|-------|------|---------|
-| Orchestrator (Native) | `orchestrator_native.yaml` | Routes via tool calls |
-| Orchestrator (Controlled) | `orchestrator_controlled.yaml` | Routes via JSON Intent |
-| Support | `support.yaml` | First-level support with RAG |
-| Ticketing | `ticketing.yaml` | Creates support tickets |
 
 ---
 
-## Workflow Variants
+## Structured Output & Routing
 
-The platform implements **two workflow variants** for comparison:
+### Pydantic Response Models
 
-### Native Variant
+Each workflow agent has a corresponding Pydantic model in `src/workflows/response_models.py` that defines its structured output. These models are passed as `response_format` when creating agents via `AzureOpenAIResponsesClient.as_agent()`.
 
-**File:** `src/workflows/handoff_native.py`
+| Agent | Model | Key Fields |
+|-------|-------|------------|
+| Orchestrator | `OrchestratorResponse` | `Intent`, `IntentClassified`, `Summary` |
+| Support | `SupportResponse` | `IsResolved`, `NeedsTicket`, `ResolutionSummary`, `Category` |
+| Ticketing | `TicketingResponse` | `TicketCreated`, `TicketId`, `Status`, `ProductFamily`, `Priority` |
+| Profiler | `ProfilerResponse` | `success`, `userId`, `email`, `displayName`, `organization` |
+| DataCollector | `DataCollectorResponse` | `success`, `subscriptionId`, `tenantId`, `domain` |
+| Communication | `CommunicationResponse` | `emailSent`, `error`, `recipientCount` |
 
-In Native mode:
-- Orchestrator uses auto-generated `handoff_to_support()`, `handoff_to_ticketing()` tools
-- The LLM decides which tool to call based on instructions
-- Routing is fully decentralized
+### How Routing Works
 
-**Pros:**
-- Simple, natural LLM behavior
-- Framework handles routing logic
-- Minimal custom code
+1. Agent returns structured JSON matching its Pydantic model
+2. Workflow YAML stores the output in a local variable (e.g., `Local.SupportOutput`)
+3. `ConditionGroup` evaluates PowerFx expressions against the output
+4. `externalLoop.when` controls multi-turn conversation loops
 
-**Cons:**
-- Less control over routing decisions
-- LLM might make incorrect choices
+```yaml
+# Example: Route based on Orchestrator output
+- kind: ConditionGroup
+  conditions:
+    - condition: =Local.OrchestratorOutput.Intent = "support"
+      actions: [...]
+    - condition: =Local.OrchestratorOutput.Intent = "ticketing"
+      actions: [...]
 
-### Controlled Variant
+# Example: Loop until resolved
+- kind: InvokeAzureAgent
+  agent:
+    name: Support
+  input:
+    externalLoop:
+      when: =Not(Local.SupportOutput.IsResolved) And Not(Local.SupportOutput.NeedsTicket)
+```
 
-**File:** `src/workflows/handoff_controlled.py`
+---
 
-In Controlled mode:
-- Orchestrator returns JSON with `Intent` field
-- Python code reads Intent and forces handoff
-- Full control over routing in Python
+## MCP Tool Integration
 
-**Pros:**
-- Predictable, deterministic routing
-- Easy to debug and log
-- Custom business logic
+Agents connect to external services via MCP (Model Context Protocol) servers.
 
-**Cons:**
-- More code to maintain
-- Requires JSON parsing
+| MCP Server | Env Variable | Used By | Purpose |
+|------------|-------------|---------|---------|
+| CosmosDB | `MCP_COSMOSDB_URL` | DataCollector, Ticketing | Query/store subscription and ticket data |
+| Entra ID | `MCP_ENTRAID_URL` | Profiler | Query user identity and profile data |
+| Email (ACS) | `MCP_EMAIL_URL` | Ticketing, Communication | Send email notifications |
+| Microsoft Learn | `MCP_LEARN_URL` | Support | Public documentation search (no auth) |
 
-### Comparison
-
-| Aspect | Native | Controlled |
-|--------|--------|------------|
-| Routing decision | LLM via tool calls | Python via Intent |
-| Control | Low | High |
-| Debugging | Hard | Easy |
-| Logging | Limited | Full |
-| Code complexity | Low | Medium |
+MCP tools are authenticated via Azure AI Foundry project connections using the `MCP_CONNECTION_NAME` variable (Managed Identity-based).
 
 ---
 
@@ -263,82 +249,52 @@ In Controlled mode:
 Create a new file in `src/agents/definitions/`:
 
 ```yaml
-# src/agents/definitions/billing.yaml
-kind: Agent
+kind: Prompt
 name: Billing
 description: |
   Handles billing inquiries and payment issues.
-
 instructions: |
   You are the Billing agent for DistriPartner.
-  
   ## Your Responsibilities
   - Answer billing questions
   - Help with payment issues
-  - Check subscription status
-  
-  ## When to Escalate
-  - Refund requests go to Ticketing
-  - Technical issues go to Support
-
 model:
   id: =Env.MODEL_DEPLOYMENT_SIMPLE
-  provider: AzureAIAgentClient
   connection:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
+  options:
+    temperature: 0.3
+    maxOutputTokens: 2000
 ```
 
-### Step 2: Add Loading Function
+### Step 2: Create Pydantic Response Model
 
-In `src/workflows/agents.py`:
+In `src/workflows/response_models.py`:
 
 ```python
-async def load_billing_agent(credential: DefaultAzureCredential) -> ChatAgent:
-    """Load the Billing agent."""
-    return await load_agent_from_yaml("billing.yaml", credential)
+class BillingResponse(BaseModel):
+    resolved: bool = Field(description="Whether the billing issue was resolved.")
+    summary: str = Field(default="", description="Summary of the billing interaction.")
 ```
 
-### Step 3: Register in HandoffBuilder
+### Step 3: Register in declarative.py
 
-In `src/workflows/handoff_native.py`:
+In `src/workflows/declarative.py`, add:
 
 ```python
-async def build_native_workflow(credential: DefaultAzureCredential) -> Workflow:
-    # Load agents
-    orchestrator = await load_orchestrator_native(credential)
-    support = await load_support_agent(credential)
-    ticketing = await load_ticketing_agent(credential)
-    billing = await load_billing_agent(credential)  # NEW
-    
-    # Build workflow
-    workflow = (
-        HandoffBuilder(
-            name="distripartner_native",
-            participants=[orchestrator, support, ticketing, billing],  # ADD
-        )
-        .with_start_agent(orchestrator)
-        .add_handoff(orchestrator, [support, ticketing, billing])  # ADD
-        .add_handoff(billing, [ticketing, support])  # Define billing paths
-        .add_handoff(support, [ticketing])
-        .build()
-    )
-    return workflow
+billing = simple_client.as_agent(
+    name="Billing",
+    instructions=_read_instructions("billing.yaml"),
+    default_options={"response_format": BillingResponse},
+)
 ```
 
-### Step 4: Update Orchestrator Instructions
+And add `"Billing": billing` to the agents registry dict.
 
-In `orchestrator_native.yaml`, add:
+### Step 4: Add to Workflow YAML
 
-```yaml
-instructions: |
-  ...
-  ### handoff_to_billing
-  Use this tool when the user:
-  - Has billing or payment questions
-  - Asks about invoices or charges
-  - Wants to check subscription status
-```
+In `src/workflows/workflow.yaml`, add an `InvokeAzureAgent` action and routing conditions.
 
 ### Step 5: Register for Individual Testing
 
@@ -355,56 +311,20 @@ AVAILABLE_AGENTS = {
 
 ```bash
 # Test individually
-python run_agent.py --agent billing
+python src/run_agent.py --agent billing
 
 # Test in workflow
-python run_workflow.py --mode native
+python src/run_workflow.py
 ```
 
 ---
 
-## Human-in-the-Loop Pattern
+## Entry Points
 
-The workflow supports multi-turn conversations with user input.
-
-### How It Works
-
-1. Workflow calls `workflow.run(user_message)`
-2. Agent responds, workflow emits `RequestInfoEvent`
-3. Workflow pauses, returns control to Python
-4. Python collects user input
-5. Workflow continues with `workflow.send_responses(responses)`
-
-### Code Pattern
-
-```python
-# Start workflow
-events = await workflow.run(user_message)
-pending_requests = extract_requests(events)
-
-# Conversation loop
-while pending_requests:
-    user_input = get_user_input()
-    
-    responses = {
-        req.request_id: HandoffAgentUserRequest.create_response(user_input)
-        for req in pending_requests
-    }
-    
-    events = await workflow.send_responses(responses)
-    pending_requests = extract_requests(events)
-```
-
-### Event Types
-
-| Event | Purpose |
-|-------|---------|
-| `AgentRunEvent` | Agent completed response |
-| `AgentRunUpdateEvent` | Streaming update |
-| `HandoffSentEvent` | Handoff initiated |
-| `RequestInfoEvent` | Waiting for user input |
-| `WorkflowOutputEvent` | Workflow completed |
-| `WorkflowStatusEvent` | State change (IDLE, etc.) |
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `src/run_workflow.py` | Run multi-agent declarative workflow | `python src/run_workflow.py [--streaming]` |
+| `src/run_agent.py` | Run individual agents for testing | `python src/run_agent.py --agent support` |
 
 ---
 
@@ -413,29 +333,27 @@ while pending_requests:
 ```
 DistriPartnerSimplePlatform/
 ├── docs/
-│   ├── ARCHITECTURE.md          # This file
-│   └── DeclarativeAgents.md     # YAML schema reference
+│   ├── ARCHITECTURE.md            # This file
+│   └── DeclarativeAgents.md       # YAML schema reference
 ├── src/
-│   ├── run_agent.py             # Run individual agents
-│   ├── run_workflow.py          # Run multi-agent workflow
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── schemas.py           # Pydantic models
+│   ├── run_agent.py               # Run individual agents (AgentFactory)
+│   ├── run_workflow.py            # Run declarative workflow
 │   ├── workflows/
-│   │   ├── __init__.py
-│   │   ├── agents.py            # Agent loading
-│   │   ├── common.py            # Shared utilities
-│   │   ├── handoff_native.py    # Native variant
-│   │   └── handoff_controlled.py # Controlled variant
+│   │   ├── __init__.py            # Module exports
+│   │   ├── declarative.py         # Agent creation + workflow runner
+│   │   ├── response_models.py     # Pydantic structured output models
+│   │   └── workflow.yaml          # Declarative workflow definition
 │   └── agents/
-│       └── definitions/          # Agent YAML files
-│           ├── orchestrator_native.yaml
+│       └── definitions/           # Agent YAML files
 │           ├── orchestrator_controlled.yaml
 │           ├── support.yaml
-│           └── ticketing.yaml
+│           ├── ticketing.yaml
+│           ├── profiler.yaml
+│           ├── dataCollector.yaml
+│           └── communication.yaml
 ├── tests/
-│   └── test_agent_schema.py     # Schema validation
-├── .env.example
+│   └── test_agent_schema.py       # Schema validation tests
+├── .env.example                   # Environment template
 ├── requirements.txt
 └── README.md
 ```
@@ -446,38 +364,42 @@ DistriPartnerSimplePlatform/
 
 ### Common Issues
 
-#### "Import could not be resolved" Errors
+#### PowerFx Expression Errors
 
-These are Pylance analyzer errors that appear when the workspace structure is new. They don't affect runtime.
+**Error:** Errors with `=Env.VARIABLE_NAME` or `=Local.OutputName.Property`
 
-**Solution:** Restart the Python language server or reload VS Code.
+**Solution:**
+1. Ensure the variable is set in `.env`
+2. Verify `safe_mode=False` in `AgentFactory` (for `run_agent.py`)
+3. For workflow variables, check that the agent's Pydantic model has the referenced field
 
 #### Agent Loading Fails
 
 **Error:** `Agent definition not found: /path/to/agent.yaml`
 
-**Solution:** 
+**Solution:**
 1. Check the YAML file exists in `src/agents/definitions/`
-2. Verify the filename matches what's in `agents.py`
+2. Verify the filename in `declarative.py` matches
 3. Ensure the YAML is valid syntax
 
-#### Handoff Tools Not Working
+#### MCP Connection Issues
 
-**Error:** Agent doesn't call handoff tools
-
-**Solution:**
-1. Check the agent's instructions mention the handoff tools
-2. Verify `add_handoff()` is configured correctly
-3. Test the agent individually with `run_agent.py`
-
-#### PowerFx Expression Errors
-
-**Error:** Errors with `=Env.VARIABLE_NAME`
+**Error:** MCP tool calls fail or timeout
 
 **Solution:**
-1. Ensure the variable is set in `.env`
-2. Verify `safe_mode=False` in `AgentFactory`
-3. Check the `.env` file path is correct
+1. Verify MCP URLs in `.env` are correct
+2. Check the `MCP_CONNECTION_NAME` matches your Azure AI Foundry connection
+3. Ensure the Managed Identity has appropriate role assignments
+4. For Microsoft Learn MCP, verify network access (no auth required)
+
+#### Structured Output Parsing Errors
+
+**Error:** Workflow cannot route because agent output doesn't match expected schema
+
+**Solution:**
+1. Verify the agent's YAML `outputSchema` matches the Pydantic model in `response_models.py`
+2. Check the PowerFx expression references in `workflow.yaml` match the Pydantic field names
+3. Test the agent individually with `run_agent.py` to see its raw output
 
 ### Debug Mode
 
@@ -493,6 +415,6 @@ logging.basicConfig(level=logging.DEBUG)
 ## References
 
 - [Microsoft Agent Framework](https://github.com/microsoft/agent-framework)
-- [HandoffBuilder Samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/getting_started/workflows/orchestration)
+- [Declarative Workflow Samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/getting_started/workflows/customer_support)
 - [Azure AI Foundry](https://azure.microsoft.com/en-us/products/ai-foundry/)
 - [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)

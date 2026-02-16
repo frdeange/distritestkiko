@@ -13,7 +13,7 @@
 # - Uses Profiler data to resolve recipient information
 # =============================================================================
 
-kind: Agent
+kind: Prompt
 name: Communication
 description: |
   Communication agent responsible for sending email notifications and
@@ -85,7 +85,7 @@ instructions: |
   4. **Localization**: Use recipient's preferred language when available
 
   ## Communication Process
-  1. Receive activity data from requesting agent
+  1. Receive activity data from the workflow (provided as context arguments)
   2. Determine appropriate recipients
   3. Format the communication appropriately
   4. Send via email MCP
@@ -98,10 +98,11 @@ instructions: |
   - Respect communication preferences
   - Handle bounced emails gracefully
   - Maintain professional tone always
+  - The workflow system handles all agent coordination and routing
+  - You do not need to call any handoff tools - just send communications and return status
 
 model:
   id: =Env.MODEL_DEPLOYMENT_SIMPLE
-  provider: AzureAIAgentClient
   connection:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT

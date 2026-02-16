@@ -1,33 +1,35 @@
 # =============================================================================
 # DistriPartner Platform - Workflow Module
 # =============================================================================
-# Programmatic workflow implementation using Microsoft Agent Framework's
-# HandoffBuilder pattern. Replaces the declarative YAML workflow.
+# Declarative workflow implementation using AzureOpenAIResponsesClient
+# and WorkflowFactory with YAML-defined routing.
 # =============================================================================
 
-from .agents import (
-    load_orchestrator_native,
-    load_orchestrator_controlled,
-    load_support_agent,
-    load_ticketing_agent,
-    get_agents_dir,
+from .declarative import (
+    create_declarative_workflow,
+    run_declarative_workflow_streaming,
+    run_declarative_workflow_interactive,
 )
 
-from .common import (
-    create_termination_condition,
-    handle_workflow_events,
-    print_agent_response,
+from .response_models import (
+    OrchestratorResponse,
+    SupportResponse,
+    TicketingResponse,
+    ProfilerResponse,
+    DataCollectorResponse,
+    CommunicationResponse,
 )
 
 __all__ = [
-    # Agent loading
-    "load_orchestrator_native",
-    "load_orchestrator_controlled",
-    "load_support_agent",
-    "load_ticketing_agent",
-    "get_agents_dir",
-    # Common utilities
-    "create_termination_condition",
-    "handle_workflow_events",
-    "print_agent_response",
+    # Declarative workflow
+    "create_declarative_workflow",
+    "run_declarative_workflow_streaming",
+    "run_declarative_workflow_interactive",
+    # Response models
+    "OrchestratorResponse",
+    "SupportResponse",
+    "TicketingResponse",
+    "ProfilerResponse",
+    "DataCollectorResponse",
+    "CommunicationResponse",
 ]

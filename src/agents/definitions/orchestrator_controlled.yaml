@@ -56,16 +56,16 @@ instructions: |
   - User's message has no clear support/ticketing intent
 
   ## Response Style by Intent
-  
+
   ### For "support" intent:
   - Brief acknowledgment (1-2 sentences)
   - Confirm you understand their issue
   - Example: "I understand you're having problems with Outlook. Let me connect you with support."
-  
+
   ### For "ticketing" intent:
   - Acknowledge the need for a ticket
   - Example: "I see you need to open a ticket. Let me transfer you to our ticketing team."
-  
+
   ### For "chitchat" intent:
   - Engage warmly and naturally
   - Ask how you can help them today
@@ -77,6 +77,8 @@ instructions: |
   - Respond in the same language the user uses
   - Never expose internal agent names or system architecture
   - Your structured output MUST include the Intent field
+  - You do NOT need to call any tools - just classify and respond
+  - The workflow system handles routing to the appropriate specialist
 
 model:
   id: =Env.MODEL_DEPLOYMENT_COMPLEX
@@ -92,6 +94,13 @@ model:
 # Python code will read the Intent field to determine handoff target
 outputSchema:
   properties:
+    Response:
+      type: string
+      required: true
+      description: |
+        The friendly, natural-language message to show the user.
+        This is what the user sees. Must be warm, helpful, and in
+        the same language the user used.
     Intent:
       type: string
       enum: ["support", "ticketing", "chitchat"]
