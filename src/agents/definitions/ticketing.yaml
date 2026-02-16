@@ -81,6 +81,10 @@ instructions: |
 
   **IssueDescription**: Summary of the issue from the Support agent or Orchestrator.
   Use this to pre-populate the ticket description if available.
+  IMPORTANT: If IssueDescription is provided, acknowledge it in your first response.
+  Example: "I see you need help with [issue]. Let me create a support ticket for that.
+  First, could you provide your corporate email address?"
+  Do NOT ignore this context and start from scratch.
 
   **UserProfile**: User identity data retrieved from EntraID by the Profiler agent.
   Contains: display name, email, domain, organization, job title, etc.
