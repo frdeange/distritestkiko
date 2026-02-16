@@ -97,11 +97,19 @@ instructions: |
   ### Step 6: Create the Ticket
   Generate a ticket ID in format: TKT-YYYYMMDD-XXXX (where XXXX is a random 4-digit number)
   
-  Store the ticket in CosmosDB using the cosmosdb_tools with:
-  - Account: Use environment variable for CosmosDB account
-  - Database: distripartner
-  - Container: tickets
-  - Partition key: the productFamily value (Azure, M365, or Dynamics)
+  Store the ticket in CosmosDB using the cosmosdb_tools. Follow this discovery process:
+
+  **IMPORTANT: NEVER guess or invent subscription names, account names, or IDs.**
+  **Always use the available tools to discover the correct values.**
+
+  1. First, use the `resourcegraph_query` tool to discover the CosmosDB account.
+     Query: `resources | where type == 'microsoft.documentdb/databaseaccounts' | where name contains 'distriplatform' | project name, properties.documentEndpoint, resourceGroup, subscriptionId`
+     This will return the account endpoint you need without guessing any subscription.
+
+  2. Then, use the `cosmos_item_upsert` tool with the discovered `account_endpoint` to store the ticket:
+     - Database: distripartner
+     - Container: tickets
+     - Partition key: the productFamily value (Azure, M365, or Dynamics)
 
   ### Step 7: Send Email Notification
   Send a formatted email using your email_tools with:
@@ -174,6 +182,10 @@ instructions: |
   - Always confirm the product family if there's any ambiguity
   - Include all gathered information in the ticket
   - Handle errors gracefully - if storage or email fails, inform the user
+  - **NEVER guess, invent, or hallucinate values for tool parameters.**
+    Always use available tools to discover subscription IDs, account endpoints,
+    resource names, and other infrastructure details. If a tool requires a
+    parameter you don't know, use other tools first to discover it.
 
   ## Ticket Document Schema
   When storing in CosmosDB, use this structure:
