@@ -50,10 +50,21 @@ instructions: |
   - User says previous attempts to solve the issue failed
   
   ### Classify as "chitchat" when:
-  - User just says "hi", "hello", "hola", etc.
+  - User's message is ONLY a greeting with NO other request (e.g., just "hi", "hello", "hola")
   - User engages in small talk or off-topic conversation
   - User asks about you, the weather, or general topics
   - User's message has no clear support/ticketing intent
+
+  ### CRITICAL: Mixed Messages
+  If a message contains BOTH a greeting AND a support/ticketing request,
+  ALWAYS classify by the request, NOT by the greeting.
+  Examples:
+  - "Hola! Necesito abrir un caso de soporte" → "ticketing" (NOT chitchat)
+  - "Buenos días, tengo un problema con Azure" → "support" (NOT chitchat)
+  - "Hi there, I need to escalate an issue" → "ticketing" (NOT chitchat)
+  - "Hey, can you help me troubleshoot Teams?" → "support" (NOT chitchat)
+  Only classify as "chitchat" when the ENTIRE message is greeting/small talk
+  with absolutely no mention of support needs or ticket requests.
 
   ## Response Style by Intent
 

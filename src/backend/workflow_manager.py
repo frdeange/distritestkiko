@@ -230,10 +230,17 @@ def _extract_response_text(raw: str) -> str:
 
     Agent responses are structured JSON with a "Response" field containing
     the natural-language message for the user. Falls back to raw text
-    if JSON parsing fails.
+    if JSON parsing fails. If the JSON is valid but has no Response field,
+    returns empty string to avoid leaking internal JSON to the user.
     """
     try:
         parsed = json.loads(raw)
-        return parsed.get("Response", "") or parsed.get("response", "") or raw
+        response = parsed.get("Response", "") or parsed.get("response", "")
+        if response:
+            return response
+        # Valid JSON but no Response field — suppress to avoid leaking
+        # internal agent output (e.g., {"emailSent": true, "error": null})
+        logger.debug("Agent output has no Response field, suppressing: %s", raw[:200])
+        return ""
     except (json.JSONDecodeError, TypeError):
         return raw.strip()

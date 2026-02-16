@@ -173,6 +173,14 @@ class DataCollectorResponse(BaseModel):
 class CommunicationResponse(BaseModel):
     """Structured output from the Communication agent."""
 
+    Response: str = Field(
+        default="",
+        description=(
+            "A brief, human-friendly status message about the email notification. "
+            "Example: 'Email notification sent successfully for ticket TKT-20240607-7324.' "
+            "This is the text shown to the user. Keep it short and informative."
+        ),
+    )
     emailSent: bool = Field(
         description="Whether the email notification was successfully sent."
     )
