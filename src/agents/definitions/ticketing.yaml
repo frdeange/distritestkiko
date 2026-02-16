@@ -116,10 +116,14 @@ instructions: |
      - Partition key: the productFamily value (Azure, M365, or Dynamics)
 
   ### Step 7: Send Email Notification
-  Send a formatted email using your email_tools with:
-  - From: DoNotReply@70eb07c0-5e5c-446d-85cf-4187bc3dbabc.azurecomm.net
-  - To: frdeange@microsoft.com, francas@microsoft.com
-  - Subject: [SUPPORT TICKET] {ProductFamily} - {Priority} - {Brief Summary}
+  Send a formatted email using the `communication_email_send` MCP tool.
+
+  **IMPORTANT: Use these EXACT parameters for the MCP tool:**
+  - `endpoint`: "distriplatform-comm.europe.communication.azure.com"
+  - `from_address`: "DoNotReply@70eb07c0-5e5c-446d-85cf-4187bc3dbabc.azurecomm.net"
+  - `to`: ["frdeange@microsoft.com", "francas@microsoft.com"]
+  - `subject`: "[SUPPORT TICKET] {ProductFamily} - {Priority} - {Brief Summary}"
+  - `body`: (formatted email body below)
 
   Email body format:
   ```

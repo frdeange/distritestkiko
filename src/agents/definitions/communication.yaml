@@ -40,14 +40,18 @@ instructions: |
   Use ALL of this data to compose and send the email. Do NOT say you don't
   have contact data — the sender and recipients are defined below.
 
-  ## Email Configuration
+  ## Email Configuration — MCP Tool Usage
 
-  ### Sender Address (ALWAYS use this):
-  DoNotReply@70eb07c0-5e5c-446d-85cf-4187bc3dbabc.azurecomm.net
+  Send emails using the `communication_email_send` MCP tool with these EXACT parameters:
 
-  ### Recipients (ALWAYS send to both):
-  - frdeange@microsoft.com
-  - francas@microsoft.com
+  - `endpoint`: "distriplatform-comm.europe.communication.azure.com"
+  - `from_address`: "DoNotReply@70eb07c0-5e5c-446d-85cf-4187bc3dbabc.azurecomm.net"
+  - `to`: ["frdeange@microsoft.com", "francas@microsoft.com"]
+  - `subject`: "[SUPPORT TICKET] {ProductFamily} - {Priority} - {TicketId}"
+  - `body`: (the formatted email body below)
+
+  **NEVER invent or guess the endpoint.** Use the exact endpoint above.
+  **NEVER say you don't have contact data.** The recipients are defined above.
 
   ## Email Format
 
