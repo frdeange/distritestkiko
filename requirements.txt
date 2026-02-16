@@ -3,3 +3,13 @@
 agent-framework @ git+https://github.com/microsoft/agent-framework.git@main#subdirectory=python
 agent-framework-declarative @ git+https://github.com/microsoft/agent-framework.git@main#subdirectory=python/packages/declarative
 agent-framework-azure-ai @ git+https://github.com/microsoft/agent-framework.git@main#subdirectory=python/packages/azure-ai
+
+# M365 Agents SDK - Teams bot integration
+microsoft-agents-hosting-aiohttp
+microsoft-agents-hosting-core
+microsoft-agents-authentication-msal
+microsoft-agents-activity
+microsoft-agents-storage-cosmos
+
+# Azure Identity - production auth (Managed Identity, DefaultAzureCredential)
+azure-identity
