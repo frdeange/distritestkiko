@@ -25,7 +25,7 @@ from agent_framework.declarative import (
     AgentExternalInputResponse,
     WorkflowFactory,
 )
-from azure.identity import AzureCliCredential
+from azure.core.credentials import TokenCredential
 
 import yaml
 
@@ -67,7 +67,7 @@ def _resolve_env(value: str) -> str:
     return value
 
 
-def create_declarative_workflow(credential: AzureCliCredential):
+def create_declarative_workflow(credential: TokenCredential):
     """
     Create the declarative workflow with all agents.
 
@@ -221,7 +221,7 @@ def create_declarative_workflow(credential: AzureCliCredential):
     return workflow
 
 
-async def run_declarative_workflow_streaming(credential: AzureCliCredential) -> None:
+async def run_declarative_workflow_streaming(credential: TokenCredential) -> None:
     """
     Run the declarative workflow with streaming output.
 
@@ -325,7 +325,7 @@ async def run_declarative_workflow_streaming(credential: AzureCliCredential) -> 
     print(f"{'=' * 60}")
 
 
-async def run_declarative_workflow_interactive(credential: AzureCliCredential) -> None:
+async def run_declarative_workflow_interactive(credential: TokenCredential) -> None:
     """
     Run the declarative workflow in non-streaming interactive mode.
 
