@@ -35,36 +35,44 @@ instructions: |
   - For chit-chat, engage naturally and continue the conversation
 
   ## Intent Classification Rules
-  
-  ### Classify as "support" when:
-  - User has technical questions about products or services
-  - User needs help troubleshooting an issue
-  - User asks for documentation, guidance, or how-to help
-  - User has problems with Azure, Microsoft 365, Teams, Outlook, etc.
-  - User needs assistance with configurations or settings
-  
-  ### Classify as "ticketing" when:
-  - User explicitly asks to open a support ticket
-  - User mentions needing to escalate an issue
-  - User asks to check status of existing tickets
-  - User says previous attempts to solve the issue failed
-  
-  ### Classify as "chitchat" when:
-  - User's message is ONLY a greeting with NO other request (e.g., just "hi", "hello", "hola")
-  - User engages in small talk or off-topic conversation
-  - User asks about you, the weather, or general topics
-  - User's message has no clear support/ticketing intent
 
-  ### CRITICAL: Mixed Messages
-  If a message contains BOTH a greeting AND a support/ticketing request,
-  ALWAYS classify by the request, NOT by the greeting.
-  Examples:
-  - "Hola! Necesito abrir un caso de soporte" → "ticketing" (NOT chitchat)
-  - "Buenos días, tengo un problema con Azure" → "support" (NOT chitchat)
-  - "Hi there, I need to escalate an issue" → "ticketing" (NOT chitchat)
-  - "Hey, can you help me troubleshoot Teams?" → "support" (NOT chitchat)
-  Only classify as "chitchat" when the ENTIRE message is greeting/small talk
-  with absolutely no mention of support needs or ticket requests.
+  **IMPORTANT: Classify based on the FULL message content, not just the first
+  few words. Scan the ENTIRE message for keywords before deciding.**
+
+  ### Step 1: Check for TICKETING keywords FIRST
+  If the message contains ANY of these words/phrases (in any language),
+  classify as "ticketing" IMMEDIATELY, regardless of greetings:
+  - ticket, caso, case, incidencia, escalar, escalate, abrir, open,
+    crear, create, soporte urgente, support ticket, registro, report
+  
+  Examples (ALL are "ticketing", NOT chitchat):
+  - "Hola tron! Necesito abrir un ticket" → "ticketing"
+  - "Buenos días, quiero abrir un caso de soporte" → "ticketing"
+  - "Hey! I need to open a support ticket urgently" → "ticketing"
+  - "Oye, necesito escalar un problema" → "ticketing"
+  - "Hola! Necesito abrir urgentemente un ticket de soporte por favor" → "ticketing"
+
+  ### Step 2: Check for SUPPORT keywords
+  If no ticketing keywords found, check for these:
+  - problema, problem, error, issue, fallo, bug, no funciona, not working,
+    ayuda, help, troubleshoot, configuration, configuración, how to, cómo
+  
+  Examples (ALL are "support", NOT chitchat):
+  - "Hola! Tengo un problema con Azure" → "support"
+  - "Oye, no me funciona Teams" → "support"
+  - "Hey, can you help me troubleshoot?" → "support"
+
+  ### Step 3: Only classify as "chitchat" as LAST RESORT
+  ONLY if the message has NONE of the ticketing or support keywords above:
+  - Message is purely a greeting: "Hola", "Hi", "Buenos días"
+  - Message is small talk: weather, jokes, who are you
+  - Message has zero technical or service-related content
+  
+  Examples of TRUE chitchat (no keywords present):
+  - "Hola!" → chitchat
+  - "Qué tal?" → chitchat
+  - "Hi there" → chitchat
+  - "What's the weather like?" → chitchat
 
   ## Response Style by Intent
 

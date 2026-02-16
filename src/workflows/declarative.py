@@ -145,7 +145,10 @@ def create_declarative_workflow(credential: TokenCredential):
     orchestrator = complex_client.as_agent(
         name="Orchestrator",
         instructions=_read_instructions("orchestrator_controlled.yaml"),
-        default_options={"response_format": OrchestratorResponse},
+        default_options={
+            "response_format": OrchestratorResponse,
+            "temperature": 0.1,
+        },
     )
 
     support_tools = []

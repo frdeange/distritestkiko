@@ -226,21 +226,95 @@ class WorkflowManager:
 
 def _extract_response_text(raw: str) -> str:
     """
-    Extract the user-facing Response field from an agent's JSON output.
+    Extract user-facing Response field(s) from agent output.
 
-    Agent responses are structured JSON with a "Response" field containing
-    the natural-language message for the user. Falls back to raw text
-    if JSON parsing fails. If the JSON is valid but has no Response field,
-    returns empty string to avoid leaking internal JSON to the user.
+    Handles:
+    - Single JSON object with a Response field
+    - Multiple JSON objects concatenated (streaming accumulation)
+    - Mixed JSON + plain text segments
+
+    For multiple JSON objects, returns only the LAST Response (the most
+    up-to-date status) plus any trailing non-JSON text.
     """
+    stripped = raw.strip()
+    if not stripped:
+        return ""
+
+    # Fast path: single valid JSON
     try:
-        parsed = json.loads(raw)
+        parsed = json.loads(stripped)
         response = parsed.get("Response", "") or parsed.get("response", "")
         if response:
             return response
-        # Valid JSON but no Response field — suppress to avoid leaking
-        # internal agent output (e.g., {"emailSent": true, "error": null})
-        logger.debug("Agent output has no Response field, suppressing: %s", raw[:200])
+        logger.debug("No Response field in JSON, suppressing: %s", stripped[:200])
         return ""
     except (json.JSONDecodeError, TypeError):
-        return raw.strip()
+        pass
+
+    # Slow path: multiple JSON objects and/or plain text segments
+    json_responses: list[str] = []
+    text_segments: list[str] = []
+    pos = 0
+
+    while pos < len(stripped):
+        # Skip whitespace
+        while pos < len(stripped) and stripped[pos] in " \t\n\r":
+            pos += 1
+        if pos >= len(stripped):
+            break
+
+        if stripped[pos] == "{":
+            # Find the matching closing brace
+            depth = 0
+            in_str = False
+            esc = False
+            end = pos
+            for i in range(pos, len(stripped)):
+                c = stripped[i]
+                if esc:
+                    esc = False
+                    continue
+                if c == "\\" and in_str:
+                    esc = True
+                    continue
+                if c == '"' and not esc:
+                    in_str = not in_str
+                    continue
+                if not in_str:
+                    if c == "{":
+                        depth += 1
+                    elif c == "}":
+                        depth -= 1
+                        if depth == 0:
+                            end = i
+                            break
+
+            json_str = stripped[pos : end + 1]
+            pos = end + 1
+            try:
+                obj = json.loads(json_str)
+                resp = obj.get("Response", "") or obj.get("response", "")
+                if resp:
+                    json_responses.append(resp)
+            except (json.JSONDecodeError, TypeError):
+                pass  # skip malformed JSON
+        else:
+            # Non-JSON text: read until next '{' or end
+            next_brace = stripped.find("{", pos)
+            if next_brace == -1:
+                segment = stripped[pos:].strip()
+                if segment:
+                    text_segments.append(segment)
+                break
+            else:
+                segment = stripped[pos:next_brace].strip()
+                if segment:
+                    text_segments.append(segment)
+                pos = next_brace
+
+    # Build result: last JSON Response (final status) + non-JSON text
+    parts: list[str] = []
+    if json_responses:
+        parts.append(json_responses[-1])
+    parts.extend(text_segments)
+    return "\n\n".join(parts) if parts else ""
