@@ -86,11 +86,15 @@ class WorkflowManager:
             self._cleanup_task.cancel()
             self._cleanup_task = None
 
-    def _get_or_create_session(self, conversation_id: str) -> WorkflowSession:
+    def _get_or_create_session(
+        self, conversation_id: str, user_identity: Optional[str] = None
+    ) -> WorkflowSession:
         """Get an existing session or create a new one."""
         if conversation_id not in self._sessions:
             logger.info("Creating new workflow session for %s", conversation_id)
-            workflow = create_declarative_workflow(self._credential)
+            workflow = create_declarative_workflow(
+                self._credential, user_identity=user_identity
+            )
             self._sessions[conversation_id] = WorkflowSession(workflow=workflow)
         session = self._sessions[conversation_id]
         session.last_activity = time.time()
@@ -107,6 +111,7 @@ class WorkflowManager:
         conversation_id: str,
         user_input: str,
         pending_request_id: Optional[str] = None,
+        user_identity: Optional[str] = None,
     ) -> AsyncGenerator[WorkflowEvent, None]:
         """
         Process a user message through the workflow.
@@ -115,11 +120,12 @@ class WorkflowManager:
             conversation_id: Teams conversation ID
             user_input: The user's message text
             pending_request_id: If resuming a multi-turn conversation
+            user_identity: Pre-built system context block with user identity
 
         Yields:
             WorkflowEvent objects for the bot handler to send to Teams
         """
-        session = self._get_or_create_session(conversation_id)
+        session = self._get_or_create_session(conversation_id, user_identity)
 
         # Start or resume the workflow
         if pending_request_id:

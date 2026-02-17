@@ -67,7 +67,9 @@ def _resolve_env(value: str) -> str:
     return value
 
 
-def create_declarative_workflow(credential: TokenCredential):
+def create_declarative_workflow(
+    credential: TokenCredential, user_identity: str | None = None
+):
     """
     Create the declarative workflow with all agents.
 
@@ -77,6 +79,11 @@ def create_declarative_workflow(credential: TokenCredential):
 
     Args:
         credential: Azure credential for authentication
+        user_identity: Optional pre-built system context block with
+            authenticated user identity (name, AAD Object ID, tenant ID).
+            When provided, this is baked into Profiler and Ticketing agent
+            instructions so they can use it deterministically without
+            relying on the Orchestrator LLM to relay it.
 
     Returns:
         Configured workflow instance ready to run
@@ -165,9 +172,20 @@ def create_declarative_workflow(credential: TokenCredential):
         ticketing_tools.append(mcp_tools["cosmosdb"])
     if "email" in mcp_tools:
         ticketing_tools.append(mcp_tools["email"])
+    ticketing_instructions = _read_instructions("ticketing.yaml")
+    if user_identity:
+        ticketing_instructions += (
+            "\n\n## Pre-loaded Authenticated User Identity\n"
+            "The following identity was extracted from the authenticated Teams "
+            "session. The user IS authenticated — do NOT ask for their name "
+            "or email. Use the UserProfile data from the Profiler agent to "
+            "fill in the Customer Information section of the ticket.\n\n"
+            f"{user_identity}\n\n"
+            "Use the User Display Name to greet the user by name."
+        )
     ticketing = simple_client.as_agent(
         name="Ticketing",
-        instructions=_read_instructions("ticketing.yaml"),
+        instructions=ticketing_instructions,
         tools=ticketing_tools if ticketing_tools else None,
         default_options={"response_format": TicketingResponse},
     )
@@ -175,9 +193,21 @@ def create_declarative_workflow(credential: TokenCredential):
     profiler_tools = []
     if "entraid" in mcp_tools:
         profiler_tools.append(mcp_tools["entraid"])
+    profiler_instructions = _read_instructions("profiler.yaml")
+    if user_identity:
+        profiler_instructions += (
+            "\n\n## Pre-loaded Authenticated User Identity\n"
+            "The following identity was extracted from the authenticated Teams "
+            "session. Use this data to query EntraID — do NOT wait for the "
+            "input message to contain identity information.\n\n"
+            f"{user_identity}\n\n"
+            "Use the User Entra Object ID above with the `entraid_user_get` "
+            "tool to retrieve the full user profile. This is the PRIMARY "
+            "source of identity — always use it when available."
+        )
     profiler = complex_client.as_agent(
         name="Profiler",
-        instructions=_read_instructions("profiler.yaml"),
+        instructions=profiler_instructions,
         tools=profiler_tools if profiler_tools else None,
         default_options={"response_format": ProfilerResponse},
     )

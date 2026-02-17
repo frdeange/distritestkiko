@@ -196,6 +196,7 @@ async def on_message(context: TurnContext, state: TurnState):
             conversation_id=conversation_id,
             user_input=user_input,
             pending_request_id=pending_request_id,
+            user_identity=workflow_state.user_identity,
         ):
             if event.type == "text" and event.text:
                 context.streaming_response.queue_text_chunk(event.text)
