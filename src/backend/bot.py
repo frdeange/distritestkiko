@@ -93,10 +93,10 @@ async def on_members_added(context: TurnContext, _state: TurnState):
     for member in members_added:
         if member.id != context.activity.recipient.id:
             await context.send_activity(
-                "Hola! Soy el asistente de DistriPartner. "
-                "Puedo ayudarte con soporte tecnico, crear tickets de incidencias "
-                "y resolver tus dudas sobre Azure, Microsoft 365 y Dynamics. "
-                "Escribe /reset para reiniciar la conversacion."
+                "Hi! I'm the DistriPartner support assistant. "
+                "I can help you with technical support, create incident tickets, "
+                "and answer your questions about Azure, Microsoft 365 and Dynamics. "
+                "Type /reset to restart the conversation."
             )
     return True
 
@@ -113,7 +113,7 @@ async def on_reset(context: TurnContext, state: TurnState):
     )
 
     await context.send_activity(
-        "Conversacion reiniciada. Puedes empezar una nueva consulta."
+        "Conversation reset. You can start a new query."
     )
     return True
 
@@ -136,7 +136,7 @@ async def on_message(context: TurnContext, state: TurnState):
         return True
 
     # Show typing indicator
-    context.streaming_response.queue_informative_update("Procesando tu consulta...")
+    context.streaming_response.queue_informative_update("Processing your request...")
 
     # Get stored workflow state
     workflow_state = state.get_value(
@@ -172,8 +172,8 @@ async def on_message(context: TurnContext, state: TurnState):
     except Exception as e:
         logger.exception("Error processing workflow for %s", conversation_id)
         context.streaming_response.queue_text_chunk(
-            "Ha ocurrido un error procesando tu consulta. "
-            "Por favor, intenta de nuevo o escribe /reset para reiniciar."
+            "An error occurred while processing your request. "
+            "Please try again or type /reset to restart."
         )
 
     await context.streaming_response.end_stream()
@@ -186,5 +186,5 @@ async def on_error(context: TurnContext, error: Exception):
     print(f"\n[on_turn_error] unhandled error: {error}", file=sys.stderr)
     traceback.print_exc()
     await context.send_activity(
-        "El bot ha encontrado un error. Por favor, intenta de nuevo."
+        "The bot encountered an error. Please try again."
     )

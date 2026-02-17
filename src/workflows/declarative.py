@@ -147,7 +147,6 @@ def create_declarative_workflow(credential: TokenCredential):
         instructions=_read_instructions("orchestrator_controlled.yaml"),
         default_options={
             "response_format": OrchestratorResponse,
-            "temperature": 0.1,
         },
     )
 

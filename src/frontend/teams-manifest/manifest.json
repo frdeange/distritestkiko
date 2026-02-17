@@ -1,0 +1,59 @@
+{
+    "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+    "manifestVersion": "1.19",
+    "version": "1.0.0",
+    "id": "18afabdf-9f4f-487e-9586-8c575c3d20bb",
+    "developer": {
+        "name": "DistriPartner",
+        "websiteUrl": "https://distripartner-bot.wonderfulhill-93cee102.swedencentral.azurecontainerapps.io",
+        "privacyUrl": "https://distripartner-bot.wonderfulhill-93cee102.swedencentral.azurecontainerapps.io/privacy",
+        "termsOfUseUrl": "https://distripartner-bot.wonderfulhill-93cee102.swedencentral.azurecontainerapps.io/terms"
+    },
+    "name": {
+        "short": "DistriPartner Support",
+        "full": "DistriPartner Support - Intelligent Assistant"
+    },
+    "description": {
+        "short": "Technical support assistant for DistriPartner partners",
+        "full": "Intelligent support bot that helps DistriPartner partners with technical queries, support ticket creation, and incident tracking. It uses multiple specialized AI agents to provide personalized assistance on Azure, Microsoft 365, and Azure Communication Services."
+    },
+    "icons": {
+        "outline": "outline.png",
+        "color": "color.png"
+    },
+    "accentColor": "#0078D4",
+    "bots": [
+        {
+            "botId": "18afabdf-9f4f-487e-9586-8c575c3d20bb",
+            "scopes": [
+                "personal",
+                "team",
+                "groupChat"
+            ],
+            "commandLists": [
+                {
+                    "scopes": [
+                        "personal",
+                        "team",
+                        "groupChat"
+                    ],
+                    "commands": [
+                        {
+                            "title": "/reset",
+                            "description": "Reset the conversation and start over"
+                        }
+                    ]
+                }
+            ],
+            "supportsFiles": false,
+            "isNotificationOnly": false
+        }
+    ],
+    "permissions": [
+        "identity",
+        "messageTeamMembers"
+    ],
+    "validDomains": [
+        "distripartner-bot.wonderfulhill-93cee102.swedencentral.azurecontainerapps.io"
+    ]
+}

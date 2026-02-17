@@ -103,7 +103,6 @@ model:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
   options:
-    temperature: 0.4
     maxOutputTokens: 2000
 
 tools:

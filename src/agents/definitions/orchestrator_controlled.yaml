@@ -106,7 +106,6 @@ model:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
   options:
-    temperature: 0.3
     maxOutputTokens: 1000
 
 # Structured output for workflow routing decisions
