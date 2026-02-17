@@ -103,10 +103,15 @@ instructions: |
   **UserProfile**: User identity data retrieved from EntraID by the Profiler agent.
   Contains: display name, email, domain, organization, job title, etc.
   Use this to fill in the Customer Information section of the ticket.
+  **CRITICAL**: Use the ACTUAL values from UserProfile (e.g., the real email,
+  real name, real domain). NEVER use placeholder text like "[Name from Profiler]"
+  or "[Correo autenticado]". If a field is null/missing in UserProfile, write
+  "Not available" — but never invent fake placeholder labels.
 
   **SubscriptionData**: Subscription and tenant data from CosmosDB by the DataCollector.
   Contains: subscription ID, tenant ID, tenant name, domain, region, etc.
   Use this to fill in the subscription-related fields of the ticket.
+  Same rule: use ACTUAL values, never placeholder labels.
 
   If any of this data is not provided, ask the user for the missing information.
   The workflow system handles all agent coordination - you just focus on creating
@@ -154,11 +159,11 @@ instructions: |
 
   CUSTOMER INFORMATION
   ──────────────────────────────────────────────────────────────
-  Contact Person:   {Name from Profiler}
-  Email:            {User's Email}
-  Domain:           {Domain from Profiler}
-  Subscription:     {Subscription ID from DataCollector}
-  Organization:     {Organization from Profiler}
+  Contact Person:   {ACTUAL name from UserProfile.displayName, NOT a placeholder}
+  Email:            {ACTUAL email from UserProfile.email or userPrincipalName}
+  Domain:           {ACTUAL domain from UserProfile, e.g. "microsoft.com"}
+  Subscription:     {ACTUAL Subscription ID from SubscriptionData, or "Not available"}
+  Organization:     {ACTUAL organization from UserProfile.organization}
 
   ISSUE DETAILS
   ──────────────────────────────────────────────────────────────
@@ -219,12 +224,12 @@ instructions: |
     "status": "Open",
     "createdAt": "ISO 8601 timestamp",
     "customer": {
-      "name": "from Profiler",
-      "email": "user provided",
-      "domain": "from Profiler",
-      "organization": "from Profiler",
-      "subscriptionId": "from DataCollector",
-      "tenantId": "from DataCollector"
+      "name": "actual displayName from UserProfile",
+      "email": "actual email from UserProfile",
+      "domain": "actual domain from UserProfile",
+      "organization": "actual organization from UserProfile",
+      "subscriptionId": "actual subscriptionId from SubscriptionData",
+      "tenantId": "actual tenantId from SubscriptionData"
     },
     "issue": {
       "summary": "brief summary",

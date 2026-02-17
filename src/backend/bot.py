@@ -147,12 +147,13 @@ async def on_message(context: TurnContext, state: TurnState):
     )
     pending_request_id = workflow_state.pending_request_id
 
-    # ── Enrich first message with authenticated user identity ──
+    # ── Enrich messages with authenticated user identity ──
     # On Teams, from_property contains the user's display name and AAD Object ID.
-    # We inject this as a [System Context] block so agents can use it without
-    # asking the user for their name or email. On channels without identity
-    # (e.g. Web Chat), no context block is added and agents fall back to asking.
-    if not pending_request_id:
+    # We build a [System Context] block once on the first message and store it
+    # in conversation state. Then we prepend it to EVERY message so that
+    # whichever agent processes the turn always has the identity available.
+    if not workflow_state.user_identity:
+        # First message: extract identity from Teams activity
         from_user = context.activity.from_property
         user_name = getattr(from_user, "name", None) if from_user else None
         user_aad_id = getattr(from_user, "aad_object_id", None) if from_user else None
@@ -174,16 +175,20 @@ async def on_message(context: TurnContext, state: TurnState):
             context_lines.append(f"Tenant ID: {user_tenant_id}")
 
         if context_lines:
-            system_context = (
+            workflow_state.user_identity = (
                 "[System Context - Authenticated User Identity]\n"
                 + "\n".join(context_lines)
-                + "\n[End System Context]\n\n"
+                + "\n[End System Context]"
             )
-            user_input = system_context + "User Message: " + user_input
+            state.set_value("ConversationState.workflow", workflow_state)
             logger.info(
-                "Identity injected for %s: name=%s aad_id=%s",
+                "Identity stored for %s: name=%s aad_id=%s",
                 context.activity.channel_id, user_name, user_aad_id,
             )
+
+    # Prepend stored identity to every message
+    if workflow_state.user_identity:
+        user_input = workflow_state.user_identity + "\n\nUser Message: " + user_input
 
     try:
         # Process through workflow
