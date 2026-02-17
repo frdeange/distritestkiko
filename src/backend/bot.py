@@ -156,20 +156,22 @@ async def on_message(context: TurnContext, state: TurnState):
         from_user = context.activity.from_property
         user_name = getattr(from_user, "name", None) if from_user else None
         user_aad_id = getattr(from_user, "aad_object_id", None) if from_user else None
+        user_tenant_id = getattr(from_user, "tenant_id", None) if from_user else None
 
-        tenant_id = None
-        channel_data = context.activity.channel_data
-        if isinstance(channel_data, dict):
-            tenant_info = channel_data.get("tenant", {})
-            tenant_id = tenant_info.get("id") if isinstance(tenant_info, dict) else None
+        # Fallback: tenant_id from channel_data (older SDK versions)
+        if not user_tenant_id:
+            channel_data = context.activity.channel_data
+            if isinstance(channel_data, dict):
+                tenant_info = channel_data.get("tenant", {})
+                user_tenant_id = tenant_info.get("id") if isinstance(tenant_info, dict) else None
 
         context_lines = []
         if user_name:
             context_lines.append(f"User Display Name: {user_name}")
         if user_aad_id:
             context_lines.append(f"User Entra Object ID: {user_aad_id}")
-        if tenant_id:
-            context_lines.append(f"Tenant ID: {tenant_id}")
+        if user_tenant_id:
+            context_lines.append(f"Tenant ID: {user_tenant_id}")
 
         if context_lines:
             system_context = (
@@ -177,7 +179,11 @@ async def on_message(context: TurnContext, state: TurnState):
                 + "\n".join(context_lines)
                 + "\n[End System Context]\n\n"
             )
-            user_input = system_context + user_input
+            user_input = system_context + "User Message: " + user_input
+            logger.info(
+                "Identity injected for %s: name=%s aad_id=%s",
+                context.activity.channel_id, user_name, user_aad_id,
+            )
 
     try:
         # Process through workflow
