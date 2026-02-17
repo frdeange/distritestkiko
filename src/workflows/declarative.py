@@ -198,12 +198,16 @@ def create_declarative_workflow(
         profiler_instructions += (
             "\n\n## Pre-loaded Authenticated User Identity\n"
             "The following identity was extracted from the authenticated Teams "
-            "session. Use this data to query EntraID — do NOT wait for the "
-            "input message to contain identity information.\n\n"
+            "session:\n\n"
             f"{user_identity}\n\n"
-            "Use the User Entra Object ID above with the `entraid_user_get` "
-            "tool to retrieve the full user profile. This is the PRIMARY "
-            "source of identity — always use it when available."
+            "## MANDATORY ACTION — YOU MUST CALL THE TOOL\n"
+            "You MUST call the `entraid_user_get` tool using the User Entra "
+            "Object ID above as the `user_id` parameter. DO NOT skip the tool "
+            "call. DO NOT return a response without first calling the tool. "
+            "The display name alone is NOT sufficient — you need the full "
+            "profile (email, UPN, department, organization, job title, etc.) "
+            "which can ONLY be retrieved by calling the EntraID tool.\n"
+            "If the tool call fails, set success=false and include the error."
         )
     profiler = complex_client.as_agent(
         name="Profiler",

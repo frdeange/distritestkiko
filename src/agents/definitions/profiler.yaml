@@ -49,7 +49,9 @@ instructions: |
      - An Entra Object ID (AAD Object ID) from the authenticated Teams session
      If an Entra Object ID is provided, use the `entraid_user_get` tool with
      the object ID directly — this is more reliable than searching by email.
-  2. Query EntraID using the MCP tools
+  2. **ALWAYS call the EntraID MCP tool** — never skip the tool call. You cannot
+     know the user's email, UPN, organization, or department without querying.
+     The display name alone is NOT enough data to return.
   3. Compile the retrieved data into structured format
   4. Return the structured output to the requesting agent
 
