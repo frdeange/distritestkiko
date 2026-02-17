@@ -124,10 +124,11 @@ async def on_message(context: TurnContext, state: TurnState):
     Main message handler. Routes user messages through the DistriPartner workflow.
 
     Flow:
-    1. Retrieve pending_request_id from conversation state (if multi-turn)
-    2. Pass message to WorkflowManager
-    3. Stream workflow events back to Teams
-    4. Save new pending_request_id for next turn
+    1. Extract authenticated user identity from Teams activity (first turn only)
+    2. Retrieve pending_request_id from conversation state (if multi-turn)
+    3. Pass message (enriched with user context) to WorkflowManager
+    4. Stream workflow events back to Teams
+    5. Save new pending_request_id for next turn
     """
     conversation_id = context.activity.conversation.id
     user_input = context.activity.text or ""
@@ -145,6 +146,38 @@ async def on_message(context: TurnContext, state: TurnState):
         target_cls=WorkflowStateItem,
     )
     pending_request_id = workflow_state.pending_request_id
+
+    # ── Enrich first message with authenticated user identity ──
+    # On Teams, from_property contains the user's display name and AAD Object ID.
+    # We inject this as a [System Context] block so agents can use it without
+    # asking the user for their name or email. On channels without identity
+    # (e.g. Web Chat), no context block is added and agents fall back to asking.
+    if not pending_request_id:
+        from_user = context.activity.from_property
+        user_name = getattr(from_user, "name", None) if from_user else None
+        user_aad_id = getattr(from_user, "aad_object_id", None) if from_user else None
+
+        tenant_id = None
+        channel_data = context.activity.channel_data
+        if isinstance(channel_data, dict):
+            tenant_info = channel_data.get("tenant", {})
+            tenant_id = tenant_info.get("id") if isinstance(tenant_info, dict) else None
+
+        context_lines = []
+        if user_name:
+            context_lines.append(f"User Display Name: {user_name}")
+        if user_aad_id:
+            context_lines.append(f"User Entra Object ID: {user_aad_id}")
+        if tenant_id:
+            context_lines.append(f"Tenant ID: {tenant_id}")
+
+        if context_lines:
+            system_context = (
+                "[System Context - Authenticated User Identity]\n"
+                + "\n".join(context_lines)
+                + "\n[End System Context]\n\n"
+            )
+            user_input = system_context + user_input
 
     try:
         # Process through workflow

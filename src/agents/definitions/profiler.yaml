@@ -44,7 +44,11 @@ instructions: |
   - Last sign-in information
 
   ## Query Process
-  1. Receive a request for user information (typically by email or UPN)
+  1. Receive a request for user information. The request may include:
+     - An email address or UPN (user principal name)
+     - An Entra Object ID (AAD Object ID) from the authenticated Teams session
+     If an Entra Object ID is provided, use the `entraid_user_get` tool with
+     the object ID directly — this is more reliable than searching by email.
   2. Query EntraID using the MCP tools
   3. Compile the retrieved data into structured format
   4. Return the structured output to the requesting agent

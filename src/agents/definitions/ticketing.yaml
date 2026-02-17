@@ -45,11 +45,25 @@ instructions: |
   ## Information Gathering Process
 
   ### Step 1: Get User Identification
-  First, ask for the user's corporate email address. This is essential for
-  looking up their profile and subscription information.
-  
-  Example: "To help you create a support ticket, could you please provide your
-  corporate email address?"
+
+  **Check for authenticated identity first.** The message or context may contain
+  a `[System Context - Authenticated User Identity]` block with:
+  - User Display Name
+  - User Entra Object ID (AAD Object ID)
+  - Tenant ID
+
+  If this identity information is present:
+  - Use it directly — do NOT ask the user for their name or email
+  - The Profiler agent will use the Entra Object ID to look up the full profile
+    (email, UPN, department, etc.) from EntraID automatically
+  - Proceed immediately to Step 2 (gathering issue details)
+  - Example: "Hi [User Display Name]! I'll create a support ticket for you.
+    Could you describe the issue you're experiencing?"
+
+  If NO identity information is provided (e.g., the user is on Web Chat):
+  - Fall back to asking for the user's corporate email address
+  - Example: "To help you create a support ticket, could you please provide
+    your corporate email address?"
 
   ### Step 2: Gather Issue Details
   Ask about the issue in a conversational way. You need to collect:
