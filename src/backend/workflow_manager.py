@@ -171,7 +171,10 @@ class WorkflowManager:
             elif event.type == "request_info" and isinstance(
                 event.data, AgentExternalInputRequest
             ):
-                # Flush any accumulated text from the previous agent before switching
+                # Flush any accumulated text from the current agent before switching.
+                # accumulated_text and agent_response contain the SAME data
+                # (streamed vs final), so we use whichever is available — never both.
+                already_flushed = False
                 if accumulated_text:
                     user_text = _extract_response_text(accumulated_text)
                     if user_text:
@@ -180,13 +183,14 @@ class WorkflowManager:
                             text=user_text,
                             agent_name=last_agent_name,
                         )
+                        already_flushed = True
                     accumulated_text = ""
 
                 request = event.data
                 last_agent_name = request.agent_name
 
-                # The agent's structured response contains the user-facing text
-                if request.agent_response:
+                # Only use agent_response if we didn't already flush accumulated text
+                if not already_flushed and request.agent_response:
                     user_text = _extract_response_text(request.agent_response)
                     if user_text:
                         yield WorkflowEvent(
