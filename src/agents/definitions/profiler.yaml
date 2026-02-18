@@ -44,16 +44,22 @@ instructions: |
   - Last sign-in information
 
   ## Query Process
-  1. Receive a request for user information. The request may include:
-     - An email address or UPN (user principal name)
-     - An Entra Object ID (AAD Object ID) from the authenticated Teams session
-     If an Entra Object ID is provided, use the `entraid_user_get` tool with
-     the object ID directly — this is more reliable than searching by email.
-  2. **ALWAYS call the EntraID MCP tool** — never skip the tool call. You cannot
-     know the user's email, UPN, organization, or department without querying.
-     The display name alone is NOT enough data to return.
-  3. Compile the retrieved data into structured format
-  4. Return the structured output to the requesting agent
+  1. Receive a request for user information. The request will include
+     pre-loaded identity data (name, email) from the authenticated Teams
+     session, and may also include an Entra Object ID.
+  2. **Use the pre-loaded identity data** (name, email) from the system
+     context as the baseline for your response. This data is already
+     verified and cross-tenant — DO NOT set these fields to null.
+  3. **Optionally call the EntraID MCP tool** to enrich the profile with
+     additional fields (department, organization, jobTitle, manager,
+     groups, licenses). Use the `entraid_user_get` tool with the Object ID
+     if one is provided.
+  4. If the EntraID tool call **fails** (e.g., cross-tenant user not found),
+     this is expected. Return success=true with the data you already have
+     from the system context — do NOT set success=false just because the
+     enrichment failed.
+  5. Compile the retrieved data into structured format
+  6. Return the structured output to the requesting agent
 
   ## Handling Missing Data
   - If a user is not found, return an error structure indicating this

@@ -13,3 +13,6 @@ microsoft-agents-storage-cosmos
 
 # Azure Identity - production auth (Managed Identity, DefaultAzureCredential)
 azure-identity
+
+# Azure CosmosDB - direct access for profile cache and conversation history
+azure-cosmos
