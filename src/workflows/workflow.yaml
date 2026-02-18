@@ -60,6 +60,7 @@ trigger:
               agent:
                 name: Support
               input:
+                messages: =UserMessage(Local.OrchestratorOutput.Summary)
                 externalLoop:
                   when: |-
                     =Not(Local.SupportOutput.IsResolved)
@@ -159,12 +160,8 @@ trigger:
               agent:
                 name: Communication
               input:
-                arguments:
-                  TicketId: =Local.TicketOutput.TicketId
-                  TicketSummary: =Local.TicketOutput.Summary
-                  IssueDescription: =Local.IssueSummary
-                  ProductFamily: =Local.TicketOutput.ProductFamily
-                  Priority: =Local.TicketOutput.Priority
+                messages: >-
+                  =UserMessage(Concatenate("TICKET DATA FOR EMAIL NOTIFICATION | TicketId = ", Local.TicketOutput.TicketId, " | ProductFamily = ", Local.TicketOutput.ProductFamily, " | Priority = ", Local.TicketOutput.Priority, " | TicketSummary = ", Local.TicketOutput.Summary, " | IssueDescription = ", Local.IssueSummary, " | CustomerData = ", Local.DataGathererOutput))
               output:
                 responseObject: Local.CommOutput
 

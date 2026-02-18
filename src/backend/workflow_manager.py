@@ -171,6 +171,17 @@ class WorkflowManager:
             elif event.type == "request_info" and isinstance(
                 event.data, AgentExternalInputRequest
             ):
+                # Flush any accumulated text from the previous agent before switching
+                if accumulated_text:
+                    user_text = _extract_response_text(accumulated_text)
+                    if user_text:
+                        yield WorkflowEvent(
+                            type="text",
+                            text=user_text,
+                            agent_name=last_agent_name,
+                        )
+                    accumulated_text = ""
+
                 request = event.data
                 last_agent_name = request.agent_name
 

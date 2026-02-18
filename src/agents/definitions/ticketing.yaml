@@ -143,7 +143,8 @@ instructions: |
   - Never create a ticket without the user's email address
   - Always confirm the product family if there's any ambiguity
   - Include all gathered information in the ticket
-  - Handle errors gracefully - if storage or email fails, inform the user
+  - NEVER attempt to send emails or notifications — email is handled exclusively by the Communication agent
+  - Handle errors gracefully - if storage fails, inform the user
   - **NEVER guess, invent, or hallucinate values for tool parameters.**
     Always use available tools to discover subscription IDs, account endpoints,
     resource names, and other infrastructure details. If a tool requires a
@@ -216,7 +217,7 @@ outputSchema:
       description: |
         Current status of the ticketing process:
         - "gathering_info": Still collecting information from user
-        - "creating_ticket": Storing ticket and sending notifications
+        - "creating_ticket": Storing ticket data in CosmosDB
         - "completed": Ticket created successfully
         - "failed": Ticket creation failed (include reason in Summary)
     Summary:
