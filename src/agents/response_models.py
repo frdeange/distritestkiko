@@ -2,10 +2,8 @@
 # DistriPartner Platform - Pydantic Response Models
 # =============================================================================
 # Structured output models used as response_format for agents in the
-# declarative workflow. These models enable the workflow YAML to evaluate
-# conditions like =Local.SupportOutput.IsResolved using PowerFx expressions.
-#
-# Each model corresponds to an agent's structured output schema.
+# HandoffBuilder orchestration. Each model defines the JSON schema that
+# the corresponding agent must return.
 # =============================================================================
 
 from pydantic import BaseModel, Field

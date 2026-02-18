@@ -6,6 +6,8 @@
 #
 # The workflow object must stay alive between HTTP requests because
 # workflow.run(responses={id: response}) resumes from where it left off.
+#
+# Uses HandoffBuilder workflows with HandoffAgentUserRequest events.
 # =============================================================================
 
 import asyncio
@@ -18,10 +20,7 @@ from typing import AsyncGenerator, Optional
 
 from azure.identity import DefaultAzureCredential
 
-from agent_framework.declarative import (
-    AgentExternalInputRequest,
-    AgentExternalInputResponse,
-)
+from agent_framework.orchestrations import HandoffAgentUserRequest
 
 import sys
 from pathlib import Path
@@ -31,7 +30,7 @@ _src_dir = str(Path(__file__).parent.parent)
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from workflows.declarative import create_declarative_workflow
+from orchestration.handoff import create_handoff_workflow
 
 from .config import SESSION_TTL_SECONDS
 
@@ -92,7 +91,7 @@ class WorkflowManager:
         """Get an existing session or create a new one."""
         if conversation_id not in self._sessions:
             logger.info("Creating new workflow session for %s", conversation_id)
-            workflow = create_declarative_workflow(
+            workflow = create_handoff_workflow(
                 self._credential, user_identity=user_identity
             )
             self._sessions[conversation_id] = WorkflowSession(workflow=workflow)
@@ -130,7 +129,7 @@ class WorkflowManager:
         # Start or resume the workflow
         if pending_request_id:
             logger.info("Resuming workflow for %s", conversation_id)
-            response = AgentExternalInputResponse(user_input=user_input)
+            response = HandoffAgentUserRequest.create_response(user_input)
             stream = session.workflow.run(
                 stream=True, responses={pending_request_id: response}
             )
@@ -169,7 +168,7 @@ class WorkflowManager:
                     accumulated_text += text
 
             elif event.type == "request_info" and isinstance(
-                event.data, AgentExternalInputRequest
+                event.data, HandoffAgentUserRequest
             ):
                 # Flush any accumulated text from the current agent before switching.
                 # accumulated_text and agent_response contain the SAME data
@@ -186,18 +185,22 @@ class WorkflowManager:
                         already_flushed = True
                     accumulated_text = ""
 
-                request = event.data
-                last_agent_name = request.agent_name
+                # Extract agent name from executor_id
+                last_agent_name = event.executor_id or ""
 
                 # Only use agent_response if we didn't already flush accumulated text
-                if not already_flushed and request.agent_response:
-                    user_text = _extract_response_text(request.agent_response)
-                    if user_text:
-                        yield WorkflowEvent(
-                            type="text",
-                            text=user_text,
-                            agent_name=last_agent_name,
-                        )
+                if not already_flushed:
+                    agent_response = event.data.agent_response
+                    if agent_response:
+                        response_text = agent_response.text or ""
+                        if response_text:
+                            user_text = _extract_response_text(response_text)
+                            if user_text:
+                                yield WorkflowEvent(
+                                    type="text",
+                                    text=user_text,
+                                    agent_name=last_agent_name,
+                                )
 
                 accumulated_text = ""
                 new_pending_id = event.request_id
