@@ -34,8 +34,7 @@ AVAILABLE_AGENTS = {
     "orchestrator": "orchestrator_controlled.yaml",
     "support": "support.yaml",
     "ticketing": "ticketing.yaml",
-    "profiler": "profiler.yaml",
-    "datacollector": "dataCollector.yaml",
+    "datagatherer": "dataGatherer.yaml",
     "communication": "communication.yaml",
 }
 

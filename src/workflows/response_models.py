@@ -117,11 +117,12 @@ class TicketingResponse(BaseModel):
     )
 
 
-class ProfilerResponse(BaseModel):
-    """Structured output from the Profiler agent."""
+class DataGathererResponse(BaseModel):
+    """Structured output from the DataGatherer agent (fused Profiler + DataCollector)."""
 
+    # Profile fields
     success: bool = Field(
-        description="Whether the profile retrieval was successful."
+        description="Whether the data gathering was successful overall."
     )
     error: str | None = Field(
         default=None,
@@ -139,17 +140,7 @@ class ProfilerResponse(BaseModel):
     phone: str = Field(default="", description="User's phone number.")
     accountEnabled: bool = Field(default=True, description="Whether account is enabled.")
 
-
-class DataCollectorResponse(BaseModel):
-    """Structured output from the DataCollector agent."""
-
-    success: bool = Field(
-        description="Whether the data retrieval was successful."
-    )
-    error: str | None = Field(
-        default=None,
-        description="Error message if retrieval failed, null otherwise.",
-    )
+    # Subscription fields
     queryTimestamp: str = Field(
         default="",
         description="ISO timestamp of when the query was executed.",

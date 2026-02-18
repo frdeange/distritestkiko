@@ -1,0 +1,170 @@
+# =============================================================================
+# DataGatherer Agent (Fused Profiler + DataCollector)
+# =============================================================================
+# Single agent that retrieves BOTH user profile data (EntraID) and subscription
+# data (CosmosDB) in one LLM call. Replaces the previous sequential
+# Profiler → DataCollector two-step pipeline to cut latency.
+#
+# Tools:
+# - mcp: EntraID MCP server for identity queries
+# - mcp: CosmosDB MCP server for subscription/tenant data queries
+#
+# Output:
+# - Combined structured JSON with user profile + subscription data
+# =============================================================================
+
+kind: Prompt
+name: DataGatherer
+description: |
+  Unified data-gathering agent that retrieves user profile information from
+  EntraID AND subscription/tenant data from CosmosDB in a single step.
+
+instructions: |
+  You are the DataGatherer agent for the DistriPartner platform. You perform
+  TWO tasks in a single pass:
+  1. Retrieve user profile from EntraID
+  2. Retrieve subscription/tenant data from CosmosDB
+
+  ## Task 1 — User Profile (EntraID)
+
+  Query EntraID for user profile information:
+  - Display name, email, UPN
+  - Organization, department, job title
+  - Manager information
+  - Phone, account status
+
+  ### Process
+  - Use the pre-loaded identity data (name, email) as the baseline.
+  - Optionally call `entraid_user_get` with the Object ID to enrich with
+    department, organization, jobTitle, manager, etc.
+  - If the EntraID call fails (e.g. cross-tenant user), return success=true
+    with the data you already have. Do NOT set success=false.
+
+  ## Task 2 — Subscription Data (CosmosDB)
+
+  Query CosmosDB for the user's subscription and tenant information:
+  - Subscription ID, name, status, tier
+  - Tenant ID, name, domain, region
+
+  ### Process
+  1. Use `resourcegraph_query` to discover CosmosDB accounts:
+     `resources | where type == 'microsoft.documentdb/databaseaccounts' | project name, properties.documentEndpoint, resourceGroup, subscriptionId`
+  2. Use the discovered endpoint to query subscription data.
+  3. If no data is found, return empty strings — do NOT invent data.
+
+  **NEVER guess or invent subscription names, account names, or IDs.**
+
+  ## Output
+  Return ALL gathered data in the structured output schema. Fill in every
+  field you can; use empty string for fields you couldn't retrieve.
+
+  ## Important Guidelines
+  - Always return structured output as defined in outputSchema
+  - Never fabricate data — use empty string for unavailable fields
+  - Handle API errors gracefully
+  - You do not need to call any handoff tools — just retrieve and return data
+
+model:
+  id: =Env.MODEL_DEPLOYMENT_MINI
+  connection:
+    kind: remote
+    endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
+  options:
+    maxOutputTokens: 1500
+
+tools:
+  - kind: mcp
+    name: entraid_tools
+    description: |
+      EntraID MCP server for querying user identity and profile information.
+      Use entraid_user_get to retrieve user profiles by Object ID or UPN.
+    url: =Env.MCP_ENTRAID_URL
+    connection:
+      kind: remote
+      name: =Env.MCP_CONNECTION_NAME
+    approvalMode:
+      kind: never
+
+  - kind: mcp
+    name: cosmosdb_tools
+    description: |
+      CosmosDB MCP server for querying subscription and tenant data.
+      Use resourcegraph_query first to discover account endpoints.
+    url: =Env.MCP_COSMOSDB_URL
+    connection:
+      kind: remote
+      name: =Env.MCP_CONNECTION_NAME
+    approvalMode:
+      kind: never
+
+outputSchema:
+  properties:
+    - name: success
+      kind: boolean
+      description: Whether the data gathering was successful overall
+      required: true
+    - name: error
+      kind: string
+      description: Error message if retrieval failed, null otherwise
+    # Profile fields
+    - name: userId
+      kind: string
+      description: Unique user identifier from EntraID
+    - name: userPrincipalName
+      kind: string
+      description: User principal name (UPN)
+    - name: email
+      kind: string
+      description: Primary email address
+    - name: displayName
+      kind: string
+      description: User's display name
+    - name: jobTitle
+      kind: string
+      description: User's job title
+    - name: department
+      kind: string
+      description: User's department
+    - name: organization
+      kind: string
+      description: User's organization/company
+    - name: managerId
+      kind: string
+      description: Manager's user ID
+    - name: managerEmail
+      kind: string
+      description: Manager's email address
+    - name: phone
+      kind: string
+      description: User's phone number
+    - name: accountEnabled
+      kind: boolean
+      description: Whether account is enabled
+    # Subscription fields
+    - name: queryTimestamp
+      kind: string
+      description: ISO timestamp of when the query was executed
+    - name: subscriptionId
+      kind: string
+      description: Primary subscription identifier
+    - name: subscriptionName
+      kind: string
+      description: Human-readable subscription name
+    - name: subscriptionStatus
+      kind: string
+      description: Subscription status (active, suspended, expired)
+    - name: tier
+      kind: string
+      description: Subscription tier/plan level
+    - name: tenantId
+      kind: string
+      description: Associated tenant ID
+    - name: tenantName
+      kind: string
+      description: Associated tenant name
+    - name: domain
+      kind: string
+      description: Primary domain for the tenant
+    - name: region
+      kind: string
+      description: Geographic region of the tenant

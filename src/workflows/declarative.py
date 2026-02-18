@@ -33,8 +33,7 @@ from .response_models import (
     OrchestratorResponse,
     SupportResponse,
     TicketingResponse,
-    ProfilerResponse,
-    DataCollectorResponse,
+    DataGathererResponse,
     CommunicationResponse,
 )
 
@@ -106,50 +105,26 @@ def create_declarative_workflow(
         deployment_name=os.getenv("MODEL_DEPLOYMENT_SIMPLE", "gpt-4.1"),
         credential=credential,
     )
+    mini_client = AzureOpenAIResponsesClient(
+        project_endpoint=project_endpoint,
+        deployment_name=os.getenv("MODEL_DEPLOYMENT_MINI", "gpt-4.1-mini"),
+        credential=credential,
+    )
 
-    # ── Create MCP tools ──
-    mcp_tools = {}
-
-    # Microsoft Learn MCP (public, no auth)
+    # ── MCP URLs ──
+    # All Azure MCP URLs may point to the same Azure MCP server (~96 tools).
+    # We create per-agent MCP tool instances with allowed_tools to restrict
+    # each agent to only the tools it needs, reducing evaluation overhead.
     learn_url = os.getenv("MCP_LEARN_URL", "https://learn.microsoft.com/api/mcp")
-    if learn_url:
-        mcp_tools["learn"] = simple_client.get_mcp_tool(
-            name="Microsoft Learn MCP",
-            url=learn_url,
-            approval_mode="never_require",
-        )
-
-    # CosmosDB MCP (authenticated via Foundry connection)
     cosmosdb_url = os.getenv("MCP_COSMOSDB_URL")
-    if cosmosdb_url:
-        mcp_tools["cosmosdb"] = simple_client.get_mcp_tool(
-            name="cosmosdb_tools",
-            url=cosmosdb_url,
-            approval_mode="never_require",
-        )
-
-    # EntraID MCP (authenticated via Foundry connection)
     entraid_url = os.getenv("MCP_ENTRAID_URL")
-    if entraid_url:
-        mcp_tools["entraid"] = complex_client.get_mcp_tool(
-            name="entraid_tools",
-            url=entraid_url,
-            approval_mode="never_require",
-        )
-
-    # Email MCP (authenticated via Foundry connection)
     email_url = os.getenv("MCP_EMAIL_URL")
-    if email_url:
-        mcp_tools["email"] = simple_client.get_mcp_tool(
-            name="email_tools",
-            url=email_url,
-            approval_mode="never_require",
-        )
 
     # ── Create agents ──
     # Instructions come from YAML files, response_format from Pydantic models
 
-    orchestrator = complex_client.as_agent(
+    # Orchestrator — no tools, just intent classification
+    orchestrator = mini_client.as_agent(
         name="Orchestrator",
         instructions=_read_instructions("orchestrator_controlled.yaml"),
         default_options={
@@ -157,9 +132,14 @@ def create_declarative_workflow(
         },
     )
 
+    # Support — Microsoft Learn MCP (separate public server, no filtering needed)
     support_tools = []
-    if "learn" in mcp_tools:
-        support_tools.append(mcp_tools["learn"])
+    if learn_url:
+        support_tools.append(simple_client.get_mcp_tool(
+            name="Microsoft Learn MCP",
+            url=learn_url,
+            approval_mode="never_require",
+        ))
     support = simple_client.as_agent(
         name="Support",
         instructions=_read_instructions("support.yaml"),
@@ -167,18 +147,28 @@ def create_declarative_workflow(
         default_options={"response_format": SupportResponse},
     )
 
+    # Ticketing — CosmosDB (write: store tickets, read: check data)
+    # Allowed: resourcegraph_query (discover endpoints), cosmos_item_upsert/query/get
     ticketing_tools = []
-    if "cosmosdb" in mcp_tools:
-        ticketing_tools.append(mcp_tools["cosmosdb"])
-    if "email" in mcp_tools:
-        ticketing_tools.append(mcp_tools["email"])
+    if cosmosdb_url:
+        ticketing_tools.append(simple_client.get_mcp_tool(
+            name="cosmosdb_tools",
+            url=cosmosdb_url,
+            allowed_tools=[
+                "resourcegraph_query",
+                "cosmos_item_upsert",
+                "cosmos_item_query",
+                "cosmos_item_get",
+            ],
+            approval_mode="never_require",
+        ))
     ticketing_instructions = _read_instructions("ticketing.yaml")
     if user_identity:
         ticketing_instructions += (
             "\n\n## Pre-loaded Authenticated User Identity\n"
             "The following identity was extracted from the authenticated Teams "
             "session. The user IS authenticated — do NOT ask for their name "
-            "or email. Use the UserProfile data from the Profiler agent to "
+            "or email. Use the GatheredData from the DataGatherer agent to "
             "fill in the Customer Information section of the ticket.\n\n"
             f"{user_identity}\n\n"
             "Use the User Display Name to greet the user by name."
@@ -190,12 +180,32 @@ def create_declarative_workflow(
         default_options={"response_format": TicketingResponse},
     )
 
-    profiler_tools = []
-    if "entraid" in mcp_tools:
-        profiler_tools.append(mcp_tools["entraid"])
-    profiler_instructions = _read_instructions("profiler.yaml")
+    # DataGatherer — EntraID (user profile) + CosmosDB (subscription data)
+    # Allowed: entraid_user_get/_manager, resourcegraph_query, cosmos_item_query
+    datagatherer_tools = []
+    if entraid_url:
+        datagatherer_tools.append(mini_client.get_mcp_tool(
+            name="entraid_tools",
+            url=entraid_url,
+            allowed_tools=[
+                "entraid_user_get",
+                "entraid_user_manager",
+            ],
+            approval_mode="never_require",
+        ))
+    if cosmosdb_url:
+        datagatherer_tools.append(mini_client.get_mcp_tool(
+            name="cosmosdb_tools",
+            url=cosmosdb_url,
+            allowed_tools=[
+                "resourcegraph_query",
+                "cosmos_item_query",
+            ],
+            approval_mode="never_require",
+        ))
+    datagatherer_instructions = _read_instructions("dataGatherer.yaml")
     if user_identity:
-        profiler_instructions += (
+        datagatherer_instructions += (
             "\n\n## Pre-loaded Authenticated User Identity\n"
             "The following identity was extracted from the authenticated Teams "
             "session and Bot Connector API. This data is ALREADY VERIFIED — "
@@ -215,27 +225,27 @@ def create_declarative_workflow(
             "First Name → firstName, Last Name → lastName, "
             "User Entra Object ID → userId."
         )
-    profiler = complex_client.as_agent(
-        name="Profiler",
-        instructions=profiler_instructions,
-        tools=profiler_tools if profiler_tools else None,
-        default_options={"response_format": ProfilerResponse},
+    datagatherer = mini_client.as_agent(
+        name="DataGatherer",
+        instructions=datagatherer_instructions,
+        tools=datagatherer_tools if datagatherer_tools else None,
+        default_options={"response_format": DataGathererResponse},
     )
 
-    datacollector_tools = []
-    if "cosmosdb" in mcp_tools:
-        datacollector_tools.append(mcp_tools["cosmosdb"])
-    datacollector = standard_client.as_agent(
-        name="DataCollector",
-        instructions=_read_instructions("dataCollector.yaml"),
-        tools=datacollector_tools if datacollector_tools else None,
-        default_options={"response_format": DataCollectorResponse},
-    )
-
+    # Communication — Email (send notifications)
+    # Allowed: communication_email_send, communication_email_status
     communication_tools = []
-    if "email" in mcp_tools:
-        communication_tools.append(mcp_tools["email"])
-    communication = simple_client.as_agent(
+    if email_url:
+        communication_tools.append(mini_client.get_mcp_tool(
+            name="email_tools",
+            url=email_url,
+            allowed_tools=[
+                "communication_email_send",
+                "communication_email_status",
+            ],
+            approval_mode="never_require",
+        ))
+    communication = mini_client.as_agent(
         name="Communication",
         instructions=_read_instructions("communication.yaml"),
         tools=communication_tools if communication_tools else None,
@@ -247,8 +257,7 @@ def create_declarative_workflow(
         "Orchestrator": orchestrator,
         "Support": support,
         "Ticketing": ticketing,
-        "Profiler": profiler,
-        "DataCollector": datacollector,
+        "DataGatherer": datagatherer,
         "Communication": communication,
     }
 

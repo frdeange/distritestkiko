@@ -15,8 +15,7 @@ from .response_models import (
     OrchestratorResponse,
     SupportResponse,
     TicketingResponse,
-    ProfilerResponse,
-    DataCollectorResponse,
+    DataGathererResponse,
     CommunicationResponse,
 )
 
@@ -29,7 +28,6 @@ __all__ = [
     "OrchestratorResponse",
     "SupportResponse",
     "TicketingResponse",
-    "ProfilerResponse",
-    "DataCollectorResponse",
+    "DataGathererResponse",
     "CommunicationResponse",
 ]

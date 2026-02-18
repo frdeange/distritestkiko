@@ -32,7 +32,8 @@ DistriPartner Platform is a customer support system that uses multiple specializ
 2. **Structured Output**: All workflow agents return Pydantic-validated JSON for deterministic routing
 3. **Separation of Concerns**: Each agent has a specific responsibility (YAML instructions + tools)
 4. **Human-in-the-Loop**: Multi-turn conversations via `externalLoop` in the workflow YAML
-5. **Cost Optimization**: Three model tiers (complex, standard, simple) assigned per agent
+5. **Cost Optimization**: Four model tiers (complex, standard, simple, mini) assigned per agent
+6. **Least-Privilege Tools**: Each agent receives only the MCP tools it needs via `allowed_tools` filtering
 
 ---
 
@@ -76,7 +77,7 @@ The platform uses the **Declarative Workflow** pattern based on guidance from th
 ```
                     ┌─────────────────┐
                     │   Orchestrator   │ ◄── externalLoop (chitchat)
-                    │  (Intent Class.) │
+                    │  (Intent Class.) │     Model: gpt-4.1-mini
                     └────────┬────────┘
                              │
               ┌──────────────┼──────────────┐
@@ -94,22 +95,21 @@ The platform uses the **Declarative Workflow** pattern based on guidance from th
      │               │
      └───────────────┘
               │
-     ┌────────┴────────┐     ┌────────────────┐
-     │    Profiler      │     │  DataCollector  │
-     │  (EntraID user)  │     │ (CosmosDB subs) │
-     └────────┬────────┘     └────────┬────────┘
-              │                       │
-              └───────────┬───────────┘
-                          │
-                 ┌────────┴────────┐
-                 │    Ticketing     │ ◄── externalLoop (ticket not created)
-                 │ (Create ticket)  │
-                 └────────┬────────┘
-                          │
-                 ┌────────┴────────┐
-                 │  Communication   │
-                 │  (Email notify)  │
-                 └─────────────────┘
+     ┌────────┴────────┐
+     │  DataGatherer    │  Model: gpt-4.1-mini
+     │ (EntraID + Cosmos│  Tools: entraid_user_get,
+     │  in one step)    │  cosmos_item_query, etc.
+     └────────┬────────┘
+              │
+     ┌────────┴────────┐
+     │    Ticketing     │ ◄── externalLoop (ticket not created)
+     │ (Create ticket)  │     Tools: cosmos_item_upsert, etc.
+     └────────┬────────┘
+              │
+     ┌────────┴────────┐
+     │  Communication   │  Model: gpt-4.1-mini
+     │  (Email notify)  │  Tools: communication_email_send
+     └─────────────────┘
 ```
 
 ### Routing Logic
@@ -122,8 +122,8 @@ The platform uses the **Declarative Workflow** pattern based on guidance from th
 | 2b | Orchestrator | Ticketing Steps | `Intent = "ticketing"` |
 | 3 | Support | Support (loop) | `Not(IsResolved) And Not(NeedsTicket)` |
 | 3a | Support | END | `IsResolved = true` |
-| 3b | Support | Profiler + DataCollector | `NeedsTicket = true` |
-| 4 | Profiler/DataCollector | Ticketing | Always (sequential) |
+| 3b | Support | DataGatherer | `NeedsTicket = true` |
+| 4 | DataGatherer | Ticketing | Always (sequential) |
 | 5 | Ticketing | Ticketing (loop) | `Not(TicketCreated)` |
 | 6 | Ticketing | Communication | `TicketCreated = true` |
 
@@ -135,14 +135,13 @@ All agents are defined in `src/agents/definitions/` as YAML files.
 
 ### Current Agents
 
-| Agent | File | Model Tier | Tools | Purpose |
-|-------|------|-----------|-------|---------|
-| Orchestrator | `orchestrator_controlled.yaml` | Complex | None | Classifies user intent into support/ticketing/chitchat |
-| Support | `support.yaml` | Simple | Microsoft Learn MCP | First-level troubleshooting with RAG |
-| Profiler | `profiler.yaml` | Complex | EntraID MCP | Retrieves user identity from Entra ID |
-| DataCollector | `dataCollector.yaml` | Standard | CosmosDB MCP | Retrieves subscription/tenant data |
-| Ticketing | `ticketing.yaml` | Simple | CosmosDB MCP, Email MCP | Creates support tickets, stores in CosmosDB |
-| Communication | `communication.yaml` | Simple | Email MCP | Sends email notifications to support team |
+| Agent | File | Model Tier | Tools (`allowed_tools`) | Purpose |
+|-------|------|-----------|------------------------|--------|
+| Orchestrator | `orchestrator_controlled.yaml` | **Mini** | None | Classifies user intent into support/ticketing/chitchat |
+| Support | `support.yaml` | Simple | Microsoft Learn MCP (separate server, no filtering) | First-level troubleshooting with RAG |
+| DataGatherer | `dataGatherer.yaml` | **Mini** | EntraID: `entraid_user_get`, `entraid_user_manager`; CosmosDB: `resourcegraph_query`, `cosmos_item_query` | Retrieves user profile + subscription data in one step |
+| Ticketing | `ticketing.yaml` | Simple | CosmosDB: `resourcegraph_query`, `cosmos_item_upsert`, `cosmos_item_query`, `cosmos_item_get` | Creates support tickets, stores in CosmosDB |
+| Communication | `communication.yaml` | **Mini** | Email: `communication_email_send`, `communication_email_status` | Sends email notifications to support team |
 
 ### Agent YAML Structure
 
@@ -156,7 +155,7 @@ instructions: |
   Detailed instructions for the agent's behavior.
 
 model:
-  id: =Env.MODEL_DEPLOYMENT_SIMPLE    # or _STANDARD, _COMPLEX
+  id: =Env.MODEL_DEPLOYMENT_SIMPLE    # or _STANDARD, _COMPLEX, _MINI
   connection:
     kind: remote
     endpoint: =Env.AZURE_AI_PROJECT_ENDPOINT
@@ -195,9 +194,8 @@ Each workflow agent has a corresponding Pydantic model in `src/workflows/respons
 |-------|-------|------------|
 | Orchestrator | `OrchestratorResponse` | `Intent`, `IntentClassified`, `Summary` |
 | Support | `SupportResponse` | `IsResolved`, `NeedsTicket`, `ResolutionSummary`, `Category` |
+| DataGatherer | `DataGathererResponse` | `userId`, `email`, `displayName`, `organization`, `subscriptionId`, `tenantId`, `domain` |
 | Ticketing | `TicketingResponse` | `TicketCreated`, `TicketId`, `Status`, `ProductFamily`, `Priority` |
-| Profiler | `ProfilerResponse` | `success`, `userId`, `email`, `displayName`, `organization` |
-| DataCollector | `DataCollectorResponse` | `success`, `subscriptionId`, `tenantId`, `domain` |
 | Communication | `CommunicationResponse` | `emailSent`, `error`, `recipientCount` |
 
 ### How Routing Works
@@ -231,12 +229,14 @@ Each workflow agent has a corresponding Pydantic model in `src/workflows/respons
 
 Agents connect to external services via MCP (Model Context Protocol) servers.
 
-| MCP Server | Env Variable | Used By | Purpose |
-|------------|-------------|---------|---------|
-| CosmosDB | `MCP_COSMOSDB_URL` | DataCollector, Ticketing | Query/store subscription and ticket data |
-| Entra ID | `MCP_ENTRAID_URL` | Profiler | Query user identity and profile data |
-| Email (ACS) | `MCP_EMAIL_URL` | Ticketing, Communication | Send email notifications |
-| Microsoft Learn | `MCP_LEARN_URL` | Support | Public documentation search (no auth) |
+| MCP Server | Env Variable | Used By | `allowed_tools` | Purpose |
+|------------|-------------|---------|-----------------|--------|
+| CosmosDB | `MCP_COSMOSDB_URL` | DataGatherer, Ticketing | DataGatherer: `resourcegraph_query`, `cosmos_item_query`; Ticketing: `resourcegraph_query`, `cosmos_item_upsert`, `cosmos_item_query`, `cosmos_item_get` | Query/store subscription and ticket data |
+| Entra ID | `MCP_ENTRAID_URL` | DataGatherer | `entraid_user_get`, `entraid_user_manager` | Query user identity and profile data |
+| Email (ACS) | `MCP_EMAIL_URL` | Communication | `communication_email_send`, `communication_email_status` | Send email notifications |
+| Microsoft Learn | `MCP_LEARN_URL` | Support | (all — separate server) | Public documentation search (no auth) |
+
+> **Note:** `MCP_COSMOSDB_URL`, `MCP_ENTRAID_URL`, and `MCP_EMAIL_URL` all point to the **same Azure MCP server** (~96 tools). The `allowed_tools` parameter in `declarative.py` filters each agent to only the tools it needs (2–4 tools per agent instead of 96).
 
 MCP tools are authenticated via Azure AI Foundry project connections using the `MCP_CONNECTION_NAME` variable (Managed Identity-based).
 
@@ -283,10 +283,18 @@ class BillingResponse(BaseModel):
 In `src/workflows/declarative.py`, add:
 
 ```python
+# If the agent needs MCP tools, create per-agent instances with allowed_tools:
+billing_cosmos_tools = get_mcp_tool(
+    url=os.getenv("MCP_COSMOSDB_URL"),
+    connection_id=mcp_conn_id,
+    allowed_tools=["cosmos_item_query", "cosmos_item_get"],
+)
+
 billing = simple_client.as_agent(
     name="Billing",
     instructions=_read_instructions("billing.yaml"),
     default_options={"response_format": BillingResponse},
+    tools=[billing_cosmos_tools],
 )
 ```
 
@@ -347,9 +355,8 @@ DistriPartnerSimplePlatform/
 │       └── definitions/           # Agent YAML files
 │           ├── orchestrator_controlled.yaml
 │           ├── support.yaml
+│           ├── dataGatherer.yaml   # Fused Profiler + DataCollector
 │           ├── ticketing.yaml
-│           ├── profiler.yaml
-│           ├── dataCollector.yaml
 │           └── communication.yaml
 ├── tests/
 │   └── test_agent_schema.py       # Schema validation tests

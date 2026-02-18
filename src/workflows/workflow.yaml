@@ -7,7 +7,7 @@
 # Flow:
 #   1. Orchestrator classifies user intent (support/ticketing/chitchat)
 #   2. Support agent handles troubleshooting (with externalLoop for multi-turn)
-#   3. If unresolved, Profiler + DataCollector gather user/subscription data
+#   3. If unresolved, DataGatherer retrieves user profile + subscription data
 #   4. Ticketing agent creates the support ticket
 #   5. Communication agent sends email notification
 #
@@ -97,42 +97,26 @@ trigger:
               value: =Local.OrchestratorOutput.Summary
 
     # ══════════════════════════════════════════════════════════════
-    # Step 3: Gather user profile data (Profiler)
+    # Step 3: Gather user profile + subscription data (DataGatherer)
     # ══════════════════════════════════════════════════════════════
-    # Profiler runs in its own conversation to avoid mixing contexts
+    # DataGatherer runs in its own conversation — retrieves both
+    # EntraID profile and CosmosDB subscription data in one step
     - kind: CreateConversation
-      id: profiler_conversation
-      conversationId: Local.ProfilerConversationId
+      id: datagatherer_conversation
+      conversationId: Local.DataGathererConversationId
 
     - kind: InvokeAzureAgent
-      id: profiler_agent
-      conversationId: =Local.ProfilerConversationId
+      id: datagatherer_agent
+      conversationId: =Local.DataGathererConversationId
       agent:
-        name: Profiler
+        name: DataGatherer
       input:
         messages: =UserMessage(Local.IssueSummary)
       output:
-        responseObject: Local.ProfilerOutput
+        responseObject: Local.DataGathererOutput
 
     # ══════════════════════════════════════════════════════════════
-    # Step 4: Gather subscription data (DataCollector)
-    # ══════════════════════════════════════════════════════════════
-    - kind: CreateConversation
-      id: datacollector_conversation
-      conversationId: Local.DataCollectorConversationId
-
-    - kind: InvokeAzureAgent
-      id: datacollector_agent
-      conversationId: =Local.DataCollectorConversationId
-      agent:
-        name: DataCollector
-      input:
-        messages: =UserMessage(Local.IssueSummary)
-      output:
-        responseObject: Local.DataCollectorOutput
-
-    # ══════════════════════════════════════════════════════════════
-    # Step 5: Create ticket (Ticketing)
+    # Step 4: Create ticket (Ticketing)
     # ══════════════════════════════════════════════════════════════
     # Ticketing agent runs in the main conversation (multi-turn with user).
     # It receives context from Profiler and DataCollector via arguments.
@@ -145,8 +129,7 @@ trigger:
       input:
         arguments:
           IssueDescription: =Local.IssueSummary
-          UserProfile: =Local.ProfilerOutput
-          SubscriptionData: =Local.DataCollectorOutput
+          GatheredData: =Local.DataGathererOutput
         externalLoop:
           when: =Not(Local.TicketOutput.TicketCreated)
       output:
@@ -158,7 +141,7 @@ trigger:
       activity: "Ticket #{Local.TicketOutput.TicketId} created successfully."
 
     # ══════════════════════════════════════════════════════════════
-    # Step 6: Send email notification (Communication)
+    # Step 5: Send email notification (Communication)
     # ══════════════════════════════════════════════════════════════
     - kind: ConditionGroup
       id: check_ticket_created
