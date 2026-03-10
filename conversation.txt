@@ -1,0 +1,12 @@
+/reset
+ 
+Conversation reset. You can start a new query.
+ 
+Hello hello! How are you doing today?
+ 
+Hello Kiko! I'm doing great, thank you for asking. How can I assist you today?
+ 
+I need to open a ticket support right now please
+ 
+An error occurred while processing your request. Please try again or type /reset to restart.
+ 
